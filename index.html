@@ -179,9 +179,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
       <h2 id="projName">Project</h2>
       <p>Share code with workers →</p>
     </div>
-    <div style="display:flex;align-items:center;gap:8px;">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
       <span class="proj-code" id="projCode"></span>
       <button class="btn b-gst b-sm" onclick="copyCode()">📋 Copy</button>
+      <button class="btn b-gst b-sm" onclick="switchProject()">🔄 Switch</button>
     </div>
   </div>
   <div class="sumbar">
@@ -270,6 +271,15 @@ function goHome(){
   showScr('scrHome');
 }
 
+// Switch to a different project
+function switchProject(){
+  try{ localStorage.removeItem('dt_last_code'); }catch(e){}
+  currentProject=null; defects=[]; docB64=null; xmlFiles={}; rels={}; media={};
+  document.getElementById('codeInput').value='';
+  showScr('scrHome');
+  toast('Enter a new project code','');
+}
+
 // Resume last project
 function resumeProject(){
   var code=localStorage.getItem('dt_last_code');
@@ -344,20 +354,13 @@ var defects=[],docB64=null,rels={},media={},xmlFiles={},selectedFile=null,curren
 
 // ── INIT ──────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',function(){
-  // Auto-reload last project if exists in localStorage
+  // Auto-resume last project when app opens (tap icon or refresh)
   try{
     var lastCode=localStorage.getItem('dt_last_code');
     if(lastCode){
+      // Auto-join immediately — no need to re-enter code
       document.getElementById('codeInput').value=lastCode;
-      // Show a resume banner instead of auto-loading (user can confirm)
-      var resumeDiv=document.getElementById('resumeBanner');
-      if(resumeDiv){
-        resumeDiv.style.display='flex';
-        resumeDiv.innerHTML=
-          '<div style="flex:1;font-size:13px;">Last project: <strong style="color:var(--grn);">'+lastCode+'</strong></div>'+
-          '<button class="btn b-grn b-sm" onclick="resumeProject()">Resume →</button>'+
-          '<button class="btn b-gst b-sm" onclick="dismissResume()">✕</button>';
-      }
+      setTimeout(function(){ joinProject(true); }, 300);
     }
   }catch(e){}
 
@@ -525,13 +528,18 @@ function parseDocxThenUpload(buf){
 }
 
 // ── JOIN PROJECT ───────────────────────────────────────
-function joinProject(){
+function joinProject(isAuto){
   var code=document.getElementById('codeInput').value.trim().toUpperCase();
   if(!code){toast('Enter a project code','r');return;}
-  showScr('scrLoad');setLoad('Connecting to cloud…','Waking up server',10);
+  showScr('scrLoad');
+  if(isAuto){
+    setLoad('Resuming project…',code,10);
+  } else {
+    setLoad('Connecting to cloud…','Waking up server',10);
+  }
   // Wake Supabase first (free tier sleeps after inactivity)
   wakeUp().then(function(){
-    setLoad('Finding project…','',20);
+    setLoad('Loading project…',code,20);
     return db('dt_projects?id=eq.'+encodeURIComponent(code)+'&select=id,name,rels,defects').then(function(rows){
     if(!rows||!rows.length){toast('Project not found: '+code,'r');showScr('scrHome');return;}
     var proj=rows[0];
