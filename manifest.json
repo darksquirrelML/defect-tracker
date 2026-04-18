@@ -2,11 +2,12 @@
   "name": "Defect Tracker",
   "short_name": "DefectTracker",
   "description": "Cloud-powered defect photo management",
-  "start_url": "./index.html",
+  "start_url": "/defect-tracker/",
+  "scope": "/defect-tracker/",
   "display": "standalone",
   "background_color": "#080c14",
   "theme_color": "#10d9a0",
-  "orientation": "portrait-primary",
+  "orientation": "portrait",
   "icons": [
     {
       "src": "icon-192.png",
