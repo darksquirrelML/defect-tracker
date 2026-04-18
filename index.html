@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Defect Tracker</title>
+<meta name="description" content="Cloud-powered defect photo management">
+<meta name="theme-color" content="#10d9a0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DefectTracker">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root{--bg:#080c14;--sur:#0f1521;--sur2:#162030;--bor:#1e2d42;--blu:#3b82f6;--grn:#10d9a0;--red:#f04f4f;--yel:#f59e0b;--txt:#e2e8f0;--mut:#4a6080;--r:12px;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;}
+::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--bor);border-radius:2px;}
+.hdr{background:rgba(8,12,20,0.95);backdrop-filter:blur(10px);border-bottom:1px solid var(--bor);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100;}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:17px;letter-spacing:-0.5px;}
+.logo span{color:var(--grn);}
+.hdr-r{display:flex;gap:8px;align-items:center;}
+.scr{display:none;}.scr.on{display:block;}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;transition:all .15s;text-decoration:none;}
+.btn:active{transform:scale(.97);}.btn:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+.b-grn{background:var(--grn);color:#000;}.b-blu{background:var(--blu);color:#fff;}
+.b-red{background:var(--red);color:#fff;}.b-gst{background:var(--sur2);color:var(--txt);border:1px solid var(--bor);}
+.b-sm{padding:7px 13px;font-size:12px;}
+/* Home */
+.home{max-width:480px;margin:0 auto;padding:40px 20px;}
+.home-logo{text-align:center;margin-bottom:36px;}
+.home-logo h1{font-family:'Syne',sans-serif;font-size:34px;font-weight:800;margin-bottom:6px;}
+.home-logo h1 span{color:var(--grn);}
+.home-logo p{color:var(--mut);font-size:13px;}
+.card-box{background:var(--sur);border:1px solid var(--bor);border-radius:16px;padding:22px;margin-bottom:14px;}
+.card-box h3{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:5px;display:flex;align-items:center;gap:8px;}
+.card-box p{color:var(--mut);font-size:13px;line-height:1.6;margin-bottom:14px;}
+.divider{text-align:center;color:var(--mut);font-size:12px;margin:18px 0;position:relative;}
+.divider::before,.divider::after{content:'';position:absolute;top:50%;width:42%;height:1px;background:var(--bor);}
+.divider::before{left:0;}.divider::after{right:0;}
+.code-row{display:flex;gap:8px;}
+.code-inp{flex:1;background:var(--sur2);border:1px solid var(--bor);border-radius:8px;padding:10px 14px;color:var(--txt);font-size:16px;font-family:'DM Mono',monospace;letter-spacing:2px;text-transform:uppercase;}
+.code-inp:focus{outline:none;border-color:var(--blu);}
+.code-inp::placeholder{letter-spacing:0;font-size:13px;color:var(--mut);text-transform:none;}
+.file-lbl{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;border-radius:8px;border:2px dashed var(--bor);color:var(--mut);font-size:13px;cursor:pointer;transition:all .2s;background:var(--sur2);margin-bottom:10px;}
+.file-lbl:hover,.file-lbl.has{border-color:var(--grn);color:var(--grn);}
+.drop-zone{border:2px dashed var(--bor);border-radius:10px;padding:28px 20px;text-align:center;cursor:pointer;transition:all .2s;background:var(--sur2);margin-bottom:0;}
+.drop-zone:hover,.drop-zone.over{border-color:var(--grn);background:rgba(16,217,160,.05);}
+.drop-zone.has{border-color:var(--grn);background:rgba(16,217,160,.08);}
+.drop-icon{font-size:36px;margin-bottom:8px;}
+.drop-text{font-size:13px;font-weight:600;color:var(--txt);margin-bottom:4px;}
+.drop-zone.has .drop-text{color:var(--grn);}
+.drop-sub{font-size:11px;color:var(--mut);}
+/* Loading */
+.load-wrap{max-width:400px;margin:120px auto;text-align:center;padding:0 20px;}
+.sp{width:40px;height:40px;border:3px solid var(--bor);border-top-color:var(--grn);border-radius:50%;animation:sp .7s linear infinite;margin:0 auto 20px;}
+@keyframes sp{to{transform:rotate(360deg);}}
+.load-wrap h3{font-family:'Syne',sans-serif;font-size:18px;margin-bottom:6px;}
+.load-wrap p{color:var(--mut);font-size:13px;}
+.lbar{margin-top:16px;background:var(--bor);border-radius:3px;height:3px;}
+.lbar-f{background:var(--grn);height:100%;border-radius:3px;width:5%;transition:width .4s;}
+/* Project header */
+.proj-hdr{background:var(--sur);border-bottom:1px solid var(--bor);padding:11px 20px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.proj-info h2{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;}
+.proj-info p{font-size:11px;color:var(--mut);}
+.proj-code{background:var(--sur2);border:1px solid var(--bor);border-radius:6px;padding:3px 10px;font-family:'DM Mono',monospace;font-size:12px;color:var(--grn);letter-spacing:1px;}
+/* Sumbar */
+.sumbar{background:var(--sur);border-bottom:1px solid var(--bor);padding:10px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.stat{display:flex;align-items:center;gap:6px;}.dot{width:7px;height:7px;border-radius:50%;}
+.d-b{background:var(--blu);}.d-g{background:var(--grn);}.d-r{background:var(--red);}
+.sl{font-size:11px;color:var(--mut);}.sv{font-size:14px;font-weight:700;font-family:'DM Mono',monospace;}
+.prog{flex:1;min-width:80px;}.pbar{background:var(--bor);border-radius:3px;height:4px;margin-top:3px;}
+.pfil{background:var(--grn);height:100%;border-radius:3px;width:0%;transition:width .5s;}
+.bbtns{display:flex;gap:6px;margin-left:auto;}
+/* Grid */
+.grid{padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;max-width:1400px;margin:0 auto;}
+/* Card */
+.card{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);overflow:hidden;transition:border-color .2s;}
+.card.dn{border-color:rgba(16,217,160,.3);}
+.ch{padding:10px 12px;border-bottom:1px solid var(--bor);display:flex;align-items:center;gap:8px;}
+.dn-num{font-family:'DM Mono',monospace;font-size:10px;background:var(--sur2);padding:2px 7px;border-radius:4px;color:var(--blu);border:1px solid var(--bor);white-space:nowrap;flex-shrink:0;}
+.dn-desc{font-size:12px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.badge{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;white-space:nowrap;flex-shrink:0;}
+.b-pend{background:rgba(240,79,79,.15);color:var(--red);}
+.b-done{background:rgba(16,217,160,.15);color:var(--grn);}
+.b-sync{background:rgba(59,130,246,.15);color:var(--blu);}
+.cb{padding:10px 12px;}
+.cmeta{font-size:11px;color:var(--mut);margin-bottom:8px;}.cmeta span{color:var(--txt);font-weight:500;}
+.photos{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;}
+.pslot{border-radius:6px;overflow:hidden;position:relative;aspect-ratio:4/3;background:var(--sur2);border:1px solid var(--bor);}
+.pslot img{width:100%;height:100%;object-fit:cover;display:block;}
+.plbl{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.7);font-size:9px;font-weight:700;padding:3px 6px;letter-spacing:.5px;text-transform:uppercase;}
+.lb{color:#fcd34d;}.la{color:var(--grn);}
+.pempty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--mut);font-size:11px;gap:3px;}
+.pei{font-size:18px;}
+.cbtns{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+/* Generate */
+.gen-wrap{max-width:460px;margin:50px auto;padding:0 20px;text-align:center;}
+.gen-wrap h2{font-family:'Syne',sans-serif;font-size:24px;margin-bottom:8px;}
+.gen-wrap>p{color:var(--mut);font-size:13px;margin-bottom:24px;}
+.gen-stats{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:20px;margin-bottom:20px;text-align:left;display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.gsl{font-size:11px;color:var(--mut);margin-bottom:3px;}.gsv{font-size:20px;font-weight:700;font-family:'DM Mono',monospace;}
+.gsv-g{color:var(--grn);}.gsv-r{color:var(--red);}
+.gacts{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+/* Modal */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:200;padding:16px;}
+.ov.hi{display:none;}
+.mod{background:var(--sur);border:1px solid var(--bor);border-radius:16px;padding:24px;max-width:440px;width:100%;}
+.mod h3{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:8px;}
+.mod p{color:var(--mut);font-size:13px;line-height:1.6;margin-bottom:16px;}
+.mod-f{display:flex;gap:10px;justify-content:flex-end;}
+/* Toast */
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--sur2);border:1px solid var(--bor);border-radius:8px;padding:10px 18px;font-size:13px;z-index:300;animation:fup .2s ease;white-space:nowrap;max-width:92vw;text-align:center;}
+.tg{border-color:var(--grn);color:var(--grn);}.tr{border-color:var(--red);color:var(--red);}.ty{border-color:var(--yel);color:var(--yel);}
+@keyframes fup{from{opacity:0;transform:translateX(-50%) translateY(8px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
+@media(max-width:480px){.grid{grid-template-columns:1fr;padding:10px;}.bbtns{width:100%;justify-content:flex-end;}.sumbar{gap:10px;}}
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<div class="scr on" id="scrHome">
+  <div class="hdr"><div class="logo">Defect<span>Tracker</span></div></div>
+  <div class="home">
+    <div class="home-logo">
+      <h1>Defect<span>Tracker</span></h1>
+      <p>Cloud-powered · Any Word format · Any phone</p>
+      <button id="installBtn" class="btn b-gst b-sm" style="display:none;margin:12px auto 0;gap:8px;" onclick="installApp()">
+        📲 Add to Home Screen
+      </button>
+    </div>
+    <div class="card-box">
+      <h3>🏢 Office — New Project</h3>
+      <p>Upload a Word defect file. A project code is generated — share it with your workers via WhatsApp.</p>
+      <input type="file" id="docxInput" accept=".docx" style="display:none;">
+      <div class="drop-zone" id="dropZone">
+        <div class="drop-icon">📄</div>
+        <div class="drop-text" id="fileLblTxt">Drop .docx here or tap to browse</div>
+        <div class="drop-sub">Supports any Word defect format</div>
+      </div>
+      <button class="btn b-grn" style="width:100%;margin-top:10px;" onclick="createProject()">➕ Create Project</button>
+    </div>
+    <div class="divider">or</div>
+    <div class="card-box">
+      <h3>📱 Worker — Open Project</h3>
+      <p>Enter the project code from your office to load all defects and take after photos.</p>
+      <div class="code-row">
+        <input type="text" class="code-inp" id="codeInput" placeholder="Enter project code" maxlength="20">
+        <button class="btn b-blu" onclick="joinProject()">Open →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="scr" id="scrLoad">
+  <div class="hdr"><div class="logo">Defect<span>Tracker</span></div></div>
+  <div class="load-wrap">
+    <div class="sp"></div>
+    <h3 id="lT">Loading…</h3>
+    <p id="lM">Please wait</p>
+    <div class="lbar"><div class="lbar-f" id="lF"></div></div>
+  </div>
+</div>
+
+<!-- LIST -->
+<div class="scr" id="scrList">
+  <div class="hdr">
+    <div class="logo">Defect<span>Tracker</span></div>
+    <div class="hdr-r">
+      <button class="btn b-gst b-sm" onclick="showScr('scrHome')">🏠 Home</button>
+    </div>
+  </div>
+  <div class="proj-hdr">
+    <div class="proj-info">
+      <h2 id="projName">Project</h2>
+      <p>Share code with workers →</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="proj-code" id="projCode"></span>
+      <button class="btn b-gst b-sm" onclick="copyCode()">📋 Copy</button>
+    </div>
+  </div>
+  <div class="sumbar">
+    <div class="stat"><div class="dot d-b"></div><div><div class="sl">Total</div><div class="sv" id="sT">0</div></div></div>
+    <div class="stat"><div class="dot d-g"></div><div><div class="sl">Done</div><div class="sv" id="sD">0</div></div></div>
+    <div class="stat"><div class="dot d-r"></div><div><div class="sl">Pending</div><div class="sv" id="sP">0</div></div></div>
+    <div class="prog"><div class="sl">Progress</div><div class="pbar"><div class="pfil" id="pF"></div></div></div>
+    <div class="bbtns">
+      <button class="btn b-gst b-sm" onclick="refreshPhotos()">🔄</button>
+      <button class="btn b-grn b-sm" onclick="showGen()">📥 Report</button>
+    </div>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<!-- GENERATE -->
+<div class="scr" id="scrGen">
+  <div class="hdr">
+    <div class="logo">Defect<span>Tracker</span></div>
+    <div class="hdr-r"><button class="btn b-gst b-sm" onclick="showScr('scrList')">← Back</button></div>
+  </div>
+  <div class="gen-wrap">
+    <h2>Generate Report</h2>
+    <p>Downloads the Word file with all after photos inserted.</p>
+    <div class="gen-stats">
+      <div><div class="gsl">Total Defects</div><div class="gsv" id="gT">0</div></div>
+      <div><div class="gsl">After Photos Done</div><div class="gsv gsv-g" id="gD">0</div></div>
+      <div><div class="gsl">Still Pending</div><div class="gsv gsv-r" id="gP">0</div></div>
+      <div><div class="gsl">Output</div><div class="gsv" style="font-size:12px;">Original .docx</div></div>
+    </div>
+    <div class="gacts">
+      <button class="btn b-gst" onclick="showScr('scrList')">← Back</button>
+      <button class="btn b-grn" id="dlBtn" onclick="generateReport()">📥 Download Report</button>
+    </div>
+    <div style="margin-top:20px;">
+      <button class="btn b-red b-sm" onclick="showMod('delOv')">🗑 Delete Project</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete modal -->
+<div class="ov hi" id="delOv">
+  <div class="mod">
+    <h3>Delete Project?</h3>
+    <p>Permanently removes this project and all photos from cloud. Download the report first!</p>
+    <div class="mod-f">
+      <button class="btn b-gst" onclick="hideMod('delOv')">Cancel</button>
+      <button class="btn b-red" onclick="deleteProject()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+// ── SUPABASE ──────────────────────────────────────────
+var SURL='https://zpmjcdbqynebhyprqmrf.supabase.co';
+var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwbWpjZGJxeW5lYmh5cHJxbXJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4MDMyNTksImV4cCI6MjA4NDM3OTI1OX0.68k7Ni0EfEVzKOa-tp9_d5QQ0Xh2u1scv_TdGwnXMtE';
+
+function db(path,method,body,retry){
+  return fetch(SURL+'/rest/v1/'+path,{
+    method:method||'GET',
+    headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':'application/json','Prefer':method==='POST'?'return=representation':''},
+    body:body?JSON.stringify(body):undefined
+  }).then(function(r){
+    if(!r.ok) return r.text().then(function(t){
+      // Auto-retry once on timeout (Supabase waking from sleep)
+      if(!retry && t.indexOf('57014')>=0){
+        console.log('Supabase timeout — retrying in 3s...');
+        return new Promise(function(res){setTimeout(res,3000);}).then(function(){
+          return db(path,method,body,true);
+        });
+      }
+      throw new Error(t);
+    });
+    var ct=r.headers.get('content-type')||'';
+    return ct.includes('json')?r.json():r.text().then(function(){return{};});
+  });
+}
+
+// Wake up Supabase before doing real work
+function wakeUp(){
+  return db('dt_projects?limit=1').catch(function(){return{};});
+}
+
+// Supabase Storage — upload any text/binary as a file
+function sto(path,data,retry){
+  var body=new Blob([data],{type:'application/octet-stream'});
+  return fetch(SURL+'/storage/v1/object/defect-files/'+path,{
+    method:'POST',
+    headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'x-upsert':'true'},
+    body:body
+  }).then(function(r){
+    if(!r.ok) return r.text().then(function(t){
+      if(!retry){
+        // Retry once after 2 seconds
+        return new Promise(function(res){setTimeout(res,2000);}).then(function(){
+          return sto(path,data,true);
+        });
+      }
+      throw new Error('Storage failed: '+t);
+    });
+    return r.json().catch(function(){return{};});
+  });
+}
+
+// Supabase Storage — download file as text
+function stoGet(path){
+  return fetch(SURL+'/storage/v1/object/defect-files/'+path,{
+    headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY}
+  }).then(function(r){
+    if(!r.ok) throw new Error('Storage download failed: '+path);
+    return r.text();
+  });
+}
+
+// Compress a base64 image to max 800px, 70% jpeg
+function compressImg(b64,mime){
+  return new Promise(function(resolve){
+    var img=new Image();
+    img.onload=function(){
+      var W=800,H=800,w=img.width,h=img.height;
+      if(w>W){h=Math.round(h*W/w);w=W;}
+      if(h>H){w=Math.round(w*H/h);h=H;}
+      var c=document.createElement('canvas');
+      c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      resolve(c.toDataURL('image/jpeg',0.7).split(',')[1]);
+    };
+    img.onerror=function(){resolve(b64);};
+    img.src='data:'+(mime||'image/jpeg')+';base64,'+b64;
+  });
+}
+
+// ── STATE ─────────────────────────────────────────────
+var defects=[],docB64=null,rels={},media={},xmlFiles={},selectedFile=null,currentProject=null;
+
+// ── INIT ──────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded',function(){
+  var dz=document.getElementById('dropZone');
+  var fi=document.getElementById('docxInput');
+  dz.addEventListener('click',function(){ fi.click(); });
+  fi.addEventListener('change',function(e){
+    if(e.target.files[0]) setSelectedFile(e.target.files[0]);
+  });
+  dz.addEventListener('dragenter',function(e){ e.preventDefault(); dz.classList.add('over'); });
+  dz.addEventListener('dragover', function(e){ e.preventDefault(); dz.classList.add('over'); });
+  dz.addEventListener('dragleave',function(e){ e.preventDefault(); dz.classList.remove('over'); });
+  dz.addEventListener('drop',function(e){
+    e.preventDefault(); dz.classList.remove('over');
+    var f=e.dataTransfer.files[0];
+    if(f) setSelectedFile(f);
+  });
+  document.addEventListener('dragover',function(e){ e.preventDefault(); });
+  document.addEventListener('drop',function(e){
+    e.preventDefault();
+    var f=e.dataTransfer.files[0];
+    if(f&&f.name.toLowerCase().endsWith('.docx')) setSelectedFile(f);
+  });
+    function setSelectedFile(f){
+    if(!f.name.toLowerCase().endsWith('.docx')){ toast('Please select a .docx file','r'); return; }
+    selectedFile=f;
+    var dz=document.getElementById('dropZone');
+    document.getElementById('fileLblTxt').textContent='✓ '+f.name;
+    dz.classList.remove('over'); dz.classList.add('has');
+  }
+
+  var params=new URLSearchParams(window.location.search);
+  var code=params.get('p');
+  if(code){ document.getElementById('codeInput').value=code.toUpperCase(); joinProject(); }
+});
+
+// ── CREATE PROJECT ─────────────────────────────────────
+function createProject(){
+  if(!selectedFile){toast('Please select a .docx file','r');return;}
+  showScr('scrLoad');setLoad('Connecting to cloud…','Waking up server',5);
+  wakeUp().then(function(){setLoad('Reading file…','',10);});
+  var r=new FileReader();
+  r.onload=function(e){
+    try{
+      var buf=e.target.result;
+      var u8=new Uint8Array(buf),bin='',chunk=8192;
+      for(var i=0;i<u8.length;i+=chunk) bin+=String.fromCharCode.apply(null,u8.subarray(i,i+chunk));
+      docB64=btoa(bin);
+      parseDocxThenUpload(buf);
+    }catch(err){toast('Error: '+err.message,'r');showScr('scrHome');}
+  };
+  r.readAsArrayBuffer(selectedFile);
+}
+
+function parseDocxThenUpload(buf){
+  setLoad('Parsing document…','',10);
+  JSZip.loadAsync(buf).then(function(zip){
+    xmlFiles={};media={};
+    var xp=[],mp=[];
+    zip.forEach(function(path,file){
+      if(path.endsWith('.xml')||path.endsWith('.rels'))
+        xp.push(file.async('string').then(function(c){xmlFiles[path]=c;}));
+      else if(path.startsWith('word/media/'))
+        mp.push(file.async('base64').then(function(b){media[path.replace('word/media/','')]=b;}));
+    });
+    setLoad('Reading images…','',25);
+    return Promise.all(xp).then(function(){return Promise.all(mp);});
+  }).then(function(){
+    setLoad('Parsing defects…','',38);
+    rels={};
+    var rx=/Id="([^"]+)"[^>]*Target="media\/([^"]+)"/g,m;
+    while((m=rx.exec(xmlFiles['word/_rels/document.xml.rels']||''))!==null) rels[m[1]]=m[2];
+    parseDefects(xmlFiles['word/document.xml']||'');
+    // Restore before + existing after images from media
+    defects.forEach(function(d){
+      if(d.rId&&rels[d.rId]&&media[rels[d.rId]]){
+        var fn=rels[d.rId],ext=fn.split('.').pop().toLowerCase();
+        d.beforeImg='data:image/'+(ext==='jpg'||ext==='jpeg'?'jpeg':ext)+';base64,'+media[fn];
+      }
+      if(d.existingAfterRid&&rels[d.existingAfterRid]&&media[rels[d.existingAfterRid]]){
+        var fn2=rels[d.existingAfterRid],ext2=fn2.split('.').pop().toLowerCase();
+        d.afterImg='data:image/'+(ext2==='jpg'||ext2==='jpeg'?'jpeg':ext2)+';base64,'+media[fn2];
+      }
+    });
+    var alreadyDone=defects.filter(function(d){return d.afterImg;}).length;
+    if(alreadyDone>0) toast(alreadyDone+' existing after photos detected ✓','g');
+    // Generate project code
+    var base=selectedFile.name.replace(/\.docx$/i,'').replace(/[^a-zA-Z0-9]/g,'').toUpperCase().substring(0,8);
+    var code=base+'-'+Math.floor(1000+Math.random()*9000);
+    // Step 1: Save metadata to DB (small)
+    setLoad('Saving project…','Step 1 of 4',45);
+    var meta={
+      id:code,
+      name:selectedFile.name.replace(/\.docx$/i,''),
+      rels:rels,
+      defects:defects.map(function(d){
+        return{tblIdx:d.tblIdx,num:d.num,desc:d.desc,location:d.location,
+               origCx:d.origCx,origCy:d.origCy,afterTcPr:d.afterTcPr,
+               injectRow:d.injectRow,injectCell:d.injectCell,
+               beforeImgKey:d.rId,existingAfterRid:d.existingAfterRid||null};
+      })
+    };
+    return db('dt_projects','POST',meta).then(function(){
+      // Step 2: Upload docx to Storage
+      setLoad('Uploading Word file…','Step 2 of 4',55);
+      return sto(code+'/docx.b64', docB64);
+    }).then(function(){
+      // Step 3: Upload XML to Storage
+      setLoad('Uploading XML…','Step 3 of 4',65);
+      return sto(code+'/xml.json', JSON.stringify(xmlFiles));
+    }).then(function(){
+      // Step 4: Compress + upload images one by one
+      setLoad('Compressing & uploading photos…','Step 4 of 4',70);
+      var mediaKeys=Object.keys(media);
+      var done=0,total=mediaKeys.length;
+      // Process in batches of 5 to avoid overwhelming
+      function uploadBatch(idx){
+        if(idx>=mediaKeys.length) return Promise.resolve();
+        var batch=mediaKeys.slice(idx,idx+5);
+        return Promise.all(batch.map(function(fname){
+          var b64=media[fname];
+          var ext=fname.split('.').pop().toLowerCase();
+          var isImg=(ext==='jpg'||ext==='jpeg'||ext==='png');
+          if(!isImg) return sto(code+'/media/'+fname, b64);
+          // Compress image first
+          return compressImg(b64,'image/'+(ext==='jpg'?'jpeg':ext)).then(function(compressed){
+            media[fname]=compressed; // update in memory too
+            return sto(code+'/media/'+fname, compressed);
+          });
+        })).then(function(){
+          done+=batch.length;
+          var pct=70+Math.round((done/total)*25);
+          setLoad('Uploading photos…',done+' of '+total+' done',pct);
+          return uploadBatch(idx+5);
+        });
+      }
+      return uploadBatch(0);
+    }).then(function(){
+      // Upload existing after photos to dt_after_photos
+      var ap=defects.filter(function(d){return d.afterImg;});
+      if(ap.length>0){
+        return Promise.all(ap.map(function(d){
+          return db('dt_after_photos','POST',{project_id:code,tbl_idx:d.tblIdx,photo_b64:d.afterImg.split(',')[1]})
+            .catch(function(){});
+        }));
+      }
+    }).then(function(){
+      currentProject={id:code,name:meta.name};
+      setLoad('Done!','Project code: '+code,100);
+      setTimeout(function(){renderProject();showScr('scrList');},500);
+    });
+  }).catch(function(e){
+    console.error(e);
+    toast('Upload failed: '+e.message,'r');
+    // Clean up the DB entry if storage failed
+    if(currentProject&&currentProject.id){
+      db('dt_projects?id=eq.'+encodeURIComponent(currentProject.id),'DELETE').catch(function(){});
+    } else {
+      // Try to find and delete by name
+      var nm=selectedFile?selectedFile.name.replace(/\.docx$/i,''):'';
+      if(nm) db('dt_projects?name=eq.'+encodeURIComponent(nm),'DELETE').catch(function(){});
+    }
+    showScr('scrHome');
+  });
+}
+
+// ── JOIN PROJECT ───────────────────────────────────────
+function joinProject(){
+  var code=document.getElementById('codeInput').value.trim().toUpperCase();
+  if(!code){toast('Enter a project code','r');return;}
+  showScr('scrLoad');setLoad('Connecting to cloud…','Waking up server',10);
+  // Wake Supabase first (free tier sleeps after inactivity)
+  wakeUp().then(function(){
+    setLoad('Finding project…','',20);
+    return db('dt_projects?id=eq.'+encodeURIComponent(code)+'&select=id,name,rels,defects').then(function(rows){
+    if(!rows||!rows.length){toast('Project not found: '+code,'r');showScr('scrHome');return;}
+    var proj=rows[0];
+    rels=proj.rels;
+    currentProject={id:code,name:proj.name};
+    // Load large files from Storage
+    setLoad('Loading Word file…','',35);
+    return stoGet(code+'/docx.b64').then(function(d){
+      docB64=d;
+      setLoad('Loading XML…','',50);
+      return stoGet(code+'/xml.json');
+    }).then(function(x){
+      xmlFiles=JSON.parse(x);
+      setLoad('Loading photos…','',65);
+      // Load only the before photos we need (not all media)
+      var beforeRids={};
+      proj.defects.forEach(function(d){
+        if(d.beforeImgKey) beforeRids[d.beforeImgKey]=rels[d.beforeImgKey];
+        if(d.existingAfterRid) beforeRids[d.existingAfterRid]=rels[d.existingAfterRid];
+      });
+      var fnames=Object.values(beforeRids).filter(Boolean);
+      return Promise.all(fnames.map(function(fname){
+        return stoGet(code+'/media/'+fname).then(function(b64){
+          media[fname]=b64;
+        }).catch(function(){});
+      }));
+    }).then(function(){
+      defects=proj.defects.map(function(d){
+        var beforeImg=null,existingAfterImg=null;
+        if(d.beforeImgKey&&rels[d.beforeImgKey]&&media[rels[d.beforeImgKey]]){
+          var fn=rels[d.beforeImgKey],ext=fn.split('.').pop().toLowerCase();
+          beforeImg='data:image/'+(ext==='jpg'||ext==='jpeg'?'jpeg':ext)+';base64,'+media[fn];
+        }
+        if(d.existingAfterRid&&rels[d.existingAfterRid]&&media[rels[d.existingAfterRid]]){
+          var fn2=rels[d.existingAfterRid],ext2=fn2.split('.').pop().toLowerCase();
+          existingAfterImg='data:image/'+(ext2==='jpg'||ext2==='jpeg'?'jpeg':ext2)+';base64,'+media[fn2];
+        }
+        return Object.assign({},d,{beforeImg:beforeImg,afterImg:existingAfterImg,rId:d.beforeImgKey});
+      });
+      setLoad('Loading after photos…','',85);
+      return db('dt_after_photos?project_id=eq.'+encodeURIComponent(code)+'&select=tbl_idx,photo_b64');
+    }).then(function(photos){
+      if(photos&&photos.length){
+        photos.forEach(function(p){
+          var d=defects.find(function(x){return x.tblIdx===p.tbl_idx;});
+          if(d) d.afterImg='data:image/jpeg;base64,'+p.photo_b64;
+        });
+      }
+      setLoad('Ready!','',100);
+      setTimeout(function(){renderProject();showScr('scrList');},400);
+    });
+    }).catch(function(e){console.error(e);toast('Error: '+e.message,'r');showScr('scrHome');});
+  }).catch(function(e){console.error(e);toast('Error: '+e.message,'r');showScr('scrHome');});
+}
+
+// ── PARSE DEFECTS — Universal ─────────────────────────
+function parseDefects(xml){
+  defects=[];
+  var num=0,tblRe=/<w:tbl>[\s\S]*?<\/w:tbl>/g,tM,tblIdx=0;
+  while((tM=tblRe.exec(xml))!==null){
+    tblIdx++;
+    var tbl=tM[0],rows=tbl.match(/<w:tr[\s\S]*?<\/w:tr>/g)||[],found=false;
+    for(var ri=0;ri<rows.length&&!found;ri++){
+      var cells=rows[ri].match(/<w:tc>[\s\S]*?<\/w:tc>/g)||[];
+      for(var ci=0;ci<cells.length-1&&!found;ci++){
+        var cell=cells[ci],nextCell=cells[ci+1];
+        var bRidM=cell.match(/r:embed="([^"]+)"/);
+        if(!bRidM) continue;
+        // Check if right cell already has an after photo (partially completed Word file)
+        var aRidM=nextCell.match(/r:embed="([^"]+)"/);
+        var cxM=cell.match(/cx="(\d+)"/),cyM=cell.match(/cy="(\d+)"/);
+        var tcPrM=nextCell.match(/<w:tcPr>[\s\S]*?<\/w:tcPr>/);
+        var txts='',txRe=/<w:t[^>]*>([^<]*)<\/w:t>/g,tx;
+        while((tx=txRe.exec(tbl))!==null) txts+=tx[1]+' ';
+        txts=txts.replace(/\s+/g,' ').trim();
+        num++;
+        defects.push({
+          tblIdx:tblIdx,num:num,desc:eDesc(txts),location:eLoc(txts),
+          beforeImg:null,
+          afterImg:null,          // restored from media after upload
+          existingAfterRid:aRidM?aRidM[1]:null,  // rId of existing after photo in docx
+          rId:bRidM[1],
+          origCx:cxM?parseInt(cxM[1]):1440000,origCy:cyM?parseInt(cyM[1]):1728000,
+          afterTcPr:tcPrM?tcPrM[0]:'',injectRow:ri,injectCell:ci+1
+        });
+        found=true;
+      }
+    }
+  }
+}
+function eDesc(t){
+  var m=t.match(/Description of Defect[:\s]*(.+?)(?:Date of Re-inspection|Photo|$)/i);
+  if(m&&m[1].trim()) return m[1].trim().substring(0,80);
+  m=t.match(/Comment[:\s]*(.+?)(?:Photo Name|Date|By|$)/i);
+  if(m&&m[1].trim()) return m[1].trim().substring(0,80);
+  m=t.match(/Photo Name[:\s]*(.+?)(?:Date|By|$)/i);
+  if(m&&m[1].trim()) return m[1].trim().substring(0,80);
+  return t.substring(0,60)||'—';
+}
+function eLoc(t){
+  var m=t.match(/(?:Closest Landmark|Chainage)[^:]*[:\s]*(.+?)(?:Description|Inside|Outside|Minor|Major|Comment|Photo|$)/i);
+  if(m&&m[1].trim()) return m[1].trim().substring(0,50);
+  m=t.match(/Location[:\s]*(.+?)(?:Comment|Photo|Date|By|$)/i);
+  if(m&&m[1].trim()) return m[1].trim().substring(0,50);
+  return '';
+}
+
+// ── RENDER ────────────────────────────────────────────
+function renderProject(){
+  document.getElementById('projName').textContent=currentProject.name;
+  document.getElementById('projCode').textContent=currentProject.id;
+  renderCards();updateStats();
+}
+function renderCards(){
+  var g=document.getElementById('grid');g.innerHTML='';
+  defects.forEach(function(d,i){g.appendChild(mkCard(d,i));});
+}
+function mkCard(d,i){
+  var el=document.createElement('div');
+  el.className='card'+(d.afterImg?' dn':'');el.id='card-'+i;
+  var bH=d.beforeImg?'<img src="'+d.beforeImg+'" alt="Before">':'<div class="pempty"><div class="pei">📷</div><div>No photo</div></div>';
+  var aH=d.afterImg?'<img src="'+d.afterImg+'" alt="After">':'<div class="pempty"><div class="pei">📸</div><div>Tap to add</div></div>';
+  var btns=d.afterImg
+    ?'<div class="cbtns"><label for="cam-'+i+'" class="btn b-gst b-sm">📷 Retake</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div>'+
+      '<button class="btn b-red b-sm" style="width:100%;margin-top:6px;" onclick="deletePhoto('+i+')">🗑 Remove After Photo</button>'
+    :'<div class="cbtns"><label for="cam-'+i+'" class="btn b-blu b-sm">📷 Camera</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div>';
+  el.innerHTML=
+    '<div class="ch">'+
+      '<div class="dn-num">#'+d.num+'</div>'+
+      '<div class="dn-desc">'+(d.desc||'No description')+'</div>'+
+      '<div class="badge '+(d.afterImg?'b-done':'b-pend')+'" id="badge-'+i+'">'+(d.afterImg?'✓ Done':'Pending')+'</div>'+
+    '</div>'+
+    '<div class="cb">'+
+      (d.location?'<div class="cmeta">📍 <span>'+d.location+'</span></div>':'')+
+      '<div class="photos">'+
+        '<div class="pslot">'+bH+'<div class="plbl lb">Before</div></div>'+
+        '<div class="pslot" id="aslot-'+i+'">'+aH+'<div class="plbl la">After</div></div>'+
+      '</div>'+
+      '<input type="file" accept="image/*" capture="environment" id="cam-'+i+'" style="display:none;">'+
+      '<input type="file" accept="image/*" id="gal-'+i+'" style="display:none;">'+
+      '<div id="btns-'+i+'">'+btns+'</div>'+
+    '</div>';
+  // Attach listeners to inputs INSIDE this element
+  el.querySelector('#cam-'+i).addEventListener('change',function(e){handlePhoto(e,i);});
+  el.querySelector('#gal-'+i).addEventListener('change',function(e){handlePhoto(e,i);});
+  return el;
+}
+
+function handlePhoto(e,i){
+  var f=e.target.files&&e.target.files[0];
+  if(!f) return;
+  var badge=document.getElementById('badge-'+i);
+  if(badge){badge.className='badge b-sync';badge.textContent='⏳ Saving…';}
+  var r=new FileReader();
+  r.onload=function(ev){
+    var url=ev.target.result,b64=url.split(',')[1];
+    defects[i].afterImg=url;
+    var aslot=document.getElementById('aslot-'+i);
+    if(aslot) aslot.innerHTML='<img src="'+url+'" alt="After"><div class="plbl la">After</div>';
+    var card=document.getElementById('card-'+i);
+    if(card) card.className='card dn';
+    var btnsDiv=document.getElementById('btns-'+i);
+    if(btnsDiv) btnsDiv.innerHTML='<div class="cbtns"><label for="cam-'+i+'" class="btn b-gst b-sm">📷 Retake</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div><button class="btn b-red b-sm" style="width:100%;margin-top:6px;" onclick="deletePhoto('+i+')">🗑 Remove After Photo</button>';
+    updateStats();
+    // Save to Supabase — delete old then insert new
+    db('dt_after_photos?project_id=eq.'+encodeURIComponent(currentProject.id)+'&tbl_idx=eq.'+defects[i].tblIdx,'DELETE').then(function(){
+      return db('dt_after_photos','POST',{project_id:currentProject.id,tbl_idx:defects[i].tblIdx,photo_b64:b64});
+    }).then(function(){
+      if(badge){badge.className='badge b-done';badge.textContent='✓ Done';}
+      toast('Saved to cloud ✓','g');
+    }).catch(function(err){
+      console.error(err);
+      if(badge){badge.className='badge b-done';badge.textContent='✓ Local';}
+      toast('Photo saved locally (check internet)','y');
+    });
+  };
+  r.readAsDataURL(f);
+  e.target.value='';
+}
+
+// ── REFRESH ────────────────────────────────────────────
+function refreshPhotos(){
+  if(!currentProject) return;
+  toast('Refreshing…','');
+  db('dt_after_photos?project_id=eq.'+encodeURIComponent(currentProject.id)+'&select=tbl_idx,photo_b64').then(function(photos){
+    var updated=0;
+    if(photos&&photos.length){
+      photos.forEach(function(p){
+        var d=defects.find(function(x){return x.tblIdx===p.tbl_idx;});
+        if(d&&!d.afterImg){d.afterImg='data:image/jpeg;base64,'+p.photo_b64;updated++;}
+      });
+    }
+    if(updated>0){renderCards();updateStats();toast(updated+' new photo(s) loaded ✓','g');}
+    else toast('Up to date','');
+  }).catch(function(){toast('Refresh failed','r');});
+}
+
+// ── STATS ──────────────────────────────────────────────
+function updateStats(){
+  var t=defects.length,d=defects.filter(function(x){return x.afterImg;}).length;
+  document.getElementById('sT').textContent=t;
+  document.getElementById('sD').textContent=d;
+  document.getElementById('sP').textContent=t-d;
+  document.getElementById('pF').style.width=(t?Math.round(d/t*100):0)+'%';
+}
+
+// ── GENERATE REPORT ────────────────────────────────────
+function showGen(){
+  var t=defects.length,d=defects.filter(function(x){return x.afterImg;}).length;
+  document.getElementById('gT').textContent=t;document.getElementById('gD').textContent=d;document.getElementById('gP').textContent=t-d;
+  showScr('scrGen');
+}
+function generateReport(){
+  var btn=document.getElementById('dlBtn');
+  btn.disabled=true;btn.textContent='⏳ Generating…';
+  JSZip.loadAsync(b64ToBuf(docB64)).then(function(zip){
+    var docXml=xmlFiles['word/document.xml'],rXml=xmlFiles['word/_rels/document.xml.rels'],ct=xmlFiles['[Content_Types].xml']||'';
+    var idRe=/Id="rId(\d+)"/g,idM,maxId=0;
+    while((idM=idRe.exec(rXml))!==null){var n=parseInt(idM[1]);if(n>maxId)maxId=n;}
+    var nextId=maxId+1,afterMap={};
+    defects.forEach(function(d){if(d.afterImg) afterMap[d.tblIdx]=d;});
+    var result='',lastIdx=0,tblIdx=0,tblRe=/<w:tbl>[\s\S]*?<\/w:tbl>/g,tM;
+    while((tM=tblRe.exec(docXml))!==null){
+      tblIdx++;result+=docXml.substring(lastIdx,tM.index);
+      var tbl=tM[0],def=afterMap[tblIdx];
+      if(def){
+        var b64=def.afterImg.split(',')[1],isJ=def.afterImg.indexOf('image/jpeg')>=0||def.afterImg.indexOf('image/jpg')>=0;
+        var ext=isJ?'jpeg':'png',fn='after_t'+tblIdx+'.'+ext;
+        zip.file('word/media/'+fn,b64,{base64:true});
+        var rId='rId'+nextId++;
+        rXml=rXml.replace('</Relationships>','<Relationship Id="'+rId+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/'+fn+'"/></Relationships>');
+        var cx=def.origCx||1440000,cy=def.origCy||1728000;
+        var rows=tbl.match(/<w:tr[\s\S]*?<\/w:tr>/g)||[];
+        var rIdx=def.injectRow;if(rIdx>=rows.length)rIdx=rows.length-1;
+        var cells=rows[rIdx].match(/<w:tc>[\s\S]*?<\/w:tc>/g)||[];
+        var cIdx=def.injectCell||1;
+        if(cells&&cells.length>cIdx){
+          var nc='<w:tc>'+(def.afterTcPr||'')+'<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r>'+mkImg(rId,cx,cy)+'</w:r></w:p></w:tc>';
+          tbl=tbl.replace(rows[rIdx],rows[rIdx].replace(cells[cIdx],nc));
+        }
+      }
+      result+=tbl;lastIdx=tM.index+tM[0].length;
+    }
+    result+=docXml.substring(lastIdx);
+    if(ct.indexOf('image/jpeg')<0) ct=ct.replace('</Types>','<Default Extension="jpeg" ContentType="image/jpeg"/></Types>');
+    if(ct.indexOf('image/png')<0)  ct=ct.replace('</Types>','<Default Extension="png" ContentType="image/png"/></Types>');
+    zip.file('word/document.xml',result);zip.file('word/_rels/document.xml.rels',rXml);zip.file('[Content_Types].xml',ct);
+    return zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6},mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+  }).then(function(blob){
+    var done=defects.filter(function(d){return d.afterImg;}).length;
+    dlBlob(blob,currentProject.name+'_'+done+'of'+defects.length+'.docx');
+    toast('Report downloaded ✓','g');btn.disabled=false;btn.textContent='📥 Download Report';
+  }).catch(function(e){toast('Error: '+e.message,'r');btn.disabled=false;btn.textContent='📥 Download Report';});
+}
+function mkImg(rId,cx,cy){
+  var id=rId.replace('rId','');
+  return '<w:drawing><wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:extent cx="'+cx+'" cy="'+cy+'"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="9'+id+'" name="A'+id+'"/><wp:cNvGraphicFramePr/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="0" name="A'+id+'"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="'+rId+'" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="'+cx+'" cy="'+cy+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing>';
+}
+
+// ── DELETE ─────────────────────────────────────────────
+function deleteProject(){
+  hideMod('delOv');
+  var pid=currentProject.id;
+  setLoad('Deleting…','Removing all data',20);
+  showScr('scrLoad');
+  // Delete DB rows first
+  db('dt_after_photos?project_id=eq.'+encodeURIComponent(pid),'DELETE').then(function(){
+    return db('dt_projects?id=eq.'+encodeURIComponent(pid),'DELETE');
+  }).then(function(){
+    setLoad('Deleting files…','Removing from storage',60);
+    // Delete storage files — list and delete
+    return fetch(SURL+'/storage/v1/object/defect-files',{
+      method:'DELETE',
+      headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':'application/json'},
+      body:JSON.stringify({prefixes:[pid+'/']})
+    }).then(function(){return{};}).catch(function(){return{};});
+  }).then(function(){
+    setLoad('Deleted!','',100);
+    setTimeout(function(){
+      currentProject=null;defects=[];docB64=null;xmlFiles={};rels={};media={};
+      showScr('scrHome');
+      toast('Project fully deleted from cloud ✓','g');
+    },400);
+  }).catch(function(e){toast('Error: '+e.message,'r');showScr('scrList');});
+}
+
+// ── DELETE PHOTO ──────────────────────────────────────
+function deletePhoto(i){
+  if(!confirm('Remove after photo for Defect #'+defects[i].num+'?')) return;
+  var badge=document.getElementById('badge-'+i);
+  if(badge){badge.className='badge b-sync';badge.textContent='⏳ Removing…';}
+  defects[i].afterImg=null;
+  // Update UI
+  var aslot=document.getElementById('aslot-'+i);
+  if(aslot) aslot.innerHTML='<div class="pempty"><div class="pei">📸</div><div>Tap to add</div></div><div class="plbl la">After</div>';
+  var card=document.getElementById('card-'+i);
+  if(card) card.className='card';
+  var btnsDiv=document.getElementById('btns-'+i);
+  if(btnsDiv) btnsDiv.innerHTML='<div class="cbtns"><label for="cam-'+i+'" class="btn b-blu b-sm">📷 Camera</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div>';
+  if(badge){badge.className='badge b-pend';badge.textContent='Pending';}
+  updateStats();
+  // Delete from Supabase
+  db('dt_after_photos?project_id=eq.'+encodeURIComponent(currentProject.id)+'&tbl_idx=eq.'+defects[i].tblIdx,'DELETE')
+    .then(function(){ toast('After photo deleted ✓','g'); })
+    .catch(function(e){ toast('Cloud delete failed: '+e.message,'r'); });
+}
+
+// ── COPY CODE ──────────────────────────────────────────
+function copyCode(){
+  if(!currentProject) return;
+  navigator.clipboard.writeText(currentProject.id).then(function(){
+    toast('Code copied: '+currentProject.id,'g');
+  }).catch(function(){toast('Code: '+currentProject.id,'');});
+}
+
+// ── HELPERS ────────────────────────────────────────────
+function installApp(){
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(function(result){
+      if(result.outcome==='accepted') toast('App installed! ✓','g');
+      deferredPrompt=null;
+      var btn=document.getElementById('installBtn');
+      if(btn) btn.style.display='none';
+    });
+  }
+}
+function showScr(id){document.querySelectorAll('.scr').forEach(function(s){s.classList.remove('on');});document.getElementById(id).classList.add('on');}
+function showMod(id){document.getElementById(id).classList.remove('hi');}
+function hideMod(id){document.getElementById(id).classList.add('hi');}
+function setLoad(t,m,p){document.getElementById('lT').textContent=t;document.getElementById('lM').textContent=m;document.getElementById('lF').style.width=p+'%';}
+function b64ToBuf(b64){var bin=atob(b64),u=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u.buffer;}
+function dlBlob(blob,name){
+  var url=URL.createObjectURL(blob);
+  if(/iPad|iPhone|iPod/.test(navigator.userAgent)){window.open(url,'_blank');toast('Tap & hold → Save to Files','ty');setTimeout(function(){URL.revokeObjectURL(url);},60000);}
+  else{var a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(url);},5000);}
+}
+var tT;
+function toast(msg,type){
+  var o=document.querySelector('.toast');if(o)o.remove();clearTimeout(tT);
+  var t=document.createElement('div');
+  t.className='toast'+(type==='g'?' tg':type==='r'?' tr':type==='y'?' ty':'');
+  t.textContent=msg;document.body.appendChild(t);
+  tT=setTimeout(function(){t.remove();},3500);
+}
+</script>
+<script>
+// Register service worker for PWA
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').then(function(reg){
+      console.log('SW registered');
+    }).catch(function(err){
+      console.log('SW failed:', err);
+    });
+  });
+}
+// Show install prompt
+var deferredPrompt;
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault();
+  deferredPrompt=e;
+  // Show install button if available
+  var btn=document.getElementById('installBtn');
+  if(btn) btn.style.display='flex';
+});
+</script>
+</body>
+</html>
