@@ -127,6 +127,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
     <div class="home-logo">
       <h1>Defect<span>Tracker</span></h1>
       <p>Cloud-powered · Any Word format · Any phone</p>
+      <div id="resumeBanner" style="display:none;align-items:center;gap:8px;background:var(--sur);border:1px solid var(--grn);border-radius:10px;padding:10px 14px;margin-top:14px;text-align:left;"></div>
       <button id="installBtn" class="btn b-gst b-sm" style="display:none;margin:12px auto 0;gap:8px;" onclick="installApp()">
         📲 Add to Home Screen
       </button>
@@ -170,7 +171,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
   <div class="hdr">
     <div class="logo">Defect<span>Tracker</span></div>
     <div class="hdr-r">
-      <button class="btn b-gst b-sm" onclick="showScr('scrHome')">🏠 Home</button>
+      <button class="btn b-gst b-sm" onclick="goHome()">🏠 Home</button>
     </div>
   </div>
   <div class="proj-hdr">
@@ -260,6 +261,30 @@ function db(path,method,body,retry){
   });
 }
 
+// Go home and clear saved code
+function goHome(){
+  try{ localStorage.removeItem('dt_last_code'); }catch(e){}
+  var b=document.getElementById('resumeBanner');
+  if(b) b.style.display='none';
+  currentProject=null; defects=[]; docB64=null; xmlFiles={}; rels={}; media={};
+  showScr('scrHome');
+}
+
+// Resume last project
+function resumeProject(){
+  var code=localStorage.getItem('dt_last_code');
+  if(code){
+    document.getElementById('codeInput').value=code;
+    joinProject();
+  }
+}
+
+function dismissResume(){
+  try{ localStorage.removeItem('dt_last_code'); }catch(e){}
+  var b=document.getElementById('resumeBanner');
+  if(b) b.style.display='none';
+}
+
 // Wake up Supabase before doing real work
 function wakeUp(){
   return db('dt_projects?limit=1').catch(function(){return{};});
@@ -319,6 +344,23 @@ var defects=[],docB64=null,rels={},media={},xmlFiles={},selectedFile=null,curren
 
 // ── INIT ──────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',function(){
+  // Auto-reload last project if exists in localStorage
+  try{
+    var lastCode=localStorage.getItem('dt_last_code');
+    if(lastCode){
+      document.getElementById('codeInput').value=lastCode;
+      // Show a resume banner instead of auto-loading (user can confirm)
+      var resumeDiv=document.getElementById('resumeBanner');
+      if(resumeDiv){
+        resumeDiv.style.display='flex';
+        resumeDiv.innerHTML=
+          '<div style="flex:1;font-size:13px;">Last project: <strong style="color:var(--grn);">'+lastCode+'</strong></div>'+
+          '<button class="btn b-grn b-sm" onclick="resumeProject()">Resume →</button>'+
+          '<button class="btn b-gst b-sm" onclick="dismissResume()">✕</button>';
+      }
+    }
+  }catch(e){}
+
   var dz=document.getElementById('dropZone');
   var fi=document.getElementById('docxInput');
   dz.addEventListener('click',function(){ fi.click(); });
@@ -602,6 +644,8 @@ function renderProject(){
   document.getElementById('projName').textContent=currentProject.name;
   document.getElementById('projCode').textContent=currentProject.id;
   renderCards();updateStats();
+  // Save last project code to localStorage
+  try{ localStorage.setItem('dt_last_code', currentProject.id); }catch(e){}
 }
 function renderCards(){
   var g=document.getElementById('grid');g.innerHTML='';
@@ -837,6 +881,19 @@ function toast(msg,type){
 }
 </script>
 <script>
+// Install PWA
+function installApp(){
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(function(r){
+      if(r.outcome==='accepted') toast('App installed! ✓','g');
+      deferredPrompt=null;
+      var btn=document.getElementById('installBtn');
+      if(btn) btn.style.display='none';
+    });
+  }
+}
+
 // Register service worker for PWA
 if('serviceWorker' in navigator){
   window.addEventListener('load', function(){
@@ -853,6 +910,39 @@ window.addEventListener('beforeinstallprompt', function(e){
   e.preventDefault();
   deferredPrompt=e;
   // Show install button if available
+  var btn=document.getElementById('installBtn');
+  if(btn) btn.style.display='flex';
+});
+</script>
+<script>
+// Install PWA
+function installApp(){
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(function(r){
+      if(r.outcome==='accepted') toast('App installed! ✓','g');
+      deferredPrompt=null;
+      var btn=document.getElementById('installBtn');
+      if(btn) btn.style.display='none';
+    });
+  }
+}
+
+// Register service worker for PWA
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('./sw.js').then(function(reg){
+      console.log('SW registered:', reg.scope);
+    }).catch(function(e){ console.log('SW failed:', e); });
+  });
+}
+
+// Show install prompt
+var deferredPrompt;
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault();
+  deferredPrompt=e;
+  // Show install button
   var btn=document.getElementById('installBtn');
   if(btn) btn.style.display='flex';
 });
