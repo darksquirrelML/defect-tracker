@@ -121,7 +121,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
 <body>
 
 <!-- HOME -->
-<div class="scr on" id="scrHome">
+<div class="scr" id="scrHome">
   <div class="hdr"><div class="logo">Defect<span>Tracker</span></div></div>
   <div class="home">
     <div class="home-logo">
@@ -354,15 +354,22 @@ var defects=[],docB64=null,rels={},media={},xmlFiles={},selectedFile=null,curren
 
 // ── INIT ──────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',function(){
-  // Auto-resume last project when app opens (tap icon or refresh)
+  // Decide which screen to show on startup
   try{
     var lastCode=localStorage.getItem('dt_last_code');
     if(lastCode){
-      // Auto-join immediately — no need to re-enter code
+      // Has saved project — go straight to loading, skip home screen
       document.getElementById('codeInput').value=lastCode;
-      setTimeout(function(){ joinProject(true); }, 300);
+      showScr('scrLoad');
+      setLoad('Resuming…',lastCode,10);
+      joinProject(true);
+    } else {
+      // No saved project — show home screen
+      showScr('scrHome');
     }
-  }catch(e){}
+  }catch(e){
+    showScr('scrHome');
+  }
 
   var dz=document.getElementById('dropZone');
   var fi=document.getElementById('docxInput');
