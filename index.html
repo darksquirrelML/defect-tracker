@@ -112,6 +112,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
 .mod p{color:var(--mut);font-size:13px;line-height:1.6;margin-bottom:16px;}
 .mod-f{display:flex;gap:10px;justify-content:flex-end;}
 /* Toast */
+.login-err{color:var(--red);font-size:12px;margin-bottom:8px;}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--sur2);border:1px solid var(--bor);border-radius:8px;padding:10px 18px;font-size:13px;z-index:300;animation:fup .2s ease;white-space:nowrap;max-width:92vw;text-align:center;}
 .tg{border-color:var(--grn);color:var(--grn);}.tr{border-color:var(--red);color:var(--red);}.ty{border-color:var(--yel);color:var(--yel);}
 @keyframes fup{from{opacity:0;transform:translateX(-50%) translateY(8px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
@@ -120,8 +121,27 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
 </head>
 <body>
 
+<!-- LOGIN -->
+<div class="scr" id="scrLogin">
+  <div class="hdr"><div class="logo">Defect<span>Tracker</span></div></div>
+  <div class="home" style="max-width:380px;">
+    <div class="home-logo" style="margin-bottom:28px;">
+      <div style="font-size:56px;margin-bottom:12px;">📸</div>
+      <h1>Defect<span>Tracker</span></h1>
+      <p>Cloud-powered defect photo management</p>
+    </div>
+    <div class="card-box">
+      <h3>🔐 Sign In</h3>
+      <p>Enter the app password to continue.</p>
+      <input type="password" id="pwInput" class="code-inp" style="width:100%;letter-spacing:4px;margin-bottom:10px;" placeholder="Password">
+      <div id="pwError" style="color:var(--red);font-size:12px;margin-bottom:8px;display:none;">Wrong password. Try again.</div>
+      <button class="btn b-grn" style="width:100%;" onclick="doLogin()">Sign In →</button>
+    </div>
+  </div>
+</div>
+
 <!-- HOME -->
-<div class="scr on" id="scrHome">
+<div class="scr" id="scrHome">
   <div class="hdr"><div class="logo">Defect<span>Tracker</span></div></div>
   <div class="home">
     <div class="home-logo">
@@ -172,6 +192,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
     <div class="logo">Defect<span>Tracker</span></div>
     <div class="hdr-r">
       <button class="btn b-gst b-sm" onclick="goHome()">🏠 Home</button>
+      <button class="btn b-gst b-sm" onclick="doLogout()">🚪 Logout</button>
     </div>
   </div>
   <div class="proj-hdr">
@@ -269,9 +290,8 @@ function goHome(){
     localStorage.removeItem('dt_defects');
     localStorage.removeItem('dt_proj_name');
     localStorage.removeItem('dt_rels');
+    S.savedCode=''; S.savedDefects=[]; S.savedProjName=''; S.savedRels={};
   }catch(e){}
-  var b=document.getElementById('resumeBanner');
-  if(b) b.style.display='none';
   currentProject=null; defects=[]; docB64=null; xmlFiles={}; rels={}; media={};
   showScr('scrHome');
 }
@@ -283,11 +303,61 @@ function switchProject(){
     localStorage.removeItem('dt_defects');
     localStorage.removeItem('dt_proj_name');
     localStorage.removeItem('dt_rels');
+    S.savedCode=''; S.savedDefects=[]; S.savedProjName=''; S.savedRels={};
   }catch(e){}
   currentProject=null; defects=[]; docB64=null; xmlFiles={}; rels={}; media={};
   document.getElementById('codeInput').value='';
   showScr('scrHome');
   toast('Enter a new project code','');
+}
+
+// ── LOGIN / LOGOUT ───────────────────────────────────
+var APP_PASSWORD = 'defect2026'; // Change this password
+
+function doLogin(){
+  var pw=document.getElementById('pwInput').value;
+  if(pw===APP_PASSWORD){
+    S.loggedIn=true;
+    try{ localStorage.setItem('dt_loggedIn','true'); }catch(e){}
+    document.getElementById('pwError').style.display='none';
+    // After login — show home or last project
+    if(S.savedCode && S.savedDefects.length>0){
+      currentProject={id:S.savedCode,name:S.savedProjName};
+      rels=S.savedRels;
+      defects=S.savedDefects.map(function(d){
+        return Object.assign({},d,{beforeImg:null,rId:d.beforeImgKey});
+      });
+      renderProject(); showScr('scrList');
+      loadBeforeImgsBackground();
+    } else if(S.savedCode){
+      document.getElementById('codeInput').value=S.savedCode;
+      joinProject(true);
+    } else {
+      showScr('scrHome');
+    }
+  } else {
+    document.getElementById('pwError').style.display='block';
+  }
+}
+
+// Allow pressing Enter to login
+document.addEventListener('keydown',function(e){
+  if(e.key==='Enter' && document.getElementById('scrLogin').classList.contains('on')){
+    doLogin();
+  }
+});
+
+function doLogout(){
+  S.loggedIn=false;
+  try{
+    localStorage.setItem('dt_loggedIn','false');
+    localStorage.removeItem('dt_last_code');
+    localStorage.removeItem('dt_defects');
+    localStorage.removeItem('dt_proj_name');
+    localStorage.removeItem('dt_rels');
+  }catch(e){}
+  currentProject=null; defects=[]; docB64=null; xmlFiles={}; rels={}; media={};
+  showScr('scrLogin');
 }
 
 // Resume last project
@@ -389,37 +459,48 @@ function compressImg(b64,mime){
 }
 
 // ── STATE ─────────────────────────────────────────────
-// State — load from localStorage synchronously (same pattern as safety violation tracker)
-var savedCode='', savedDefects=[], savedProjName='', savedRels={};
+// ── STATE (loaded synchronously from localStorage before anything renders) ──
+var S = {
+  loggedIn: false,
+  savedCode: '',
+  savedDefects: [],
+  savedProjName: '',
+  savedRels: {}
+};
 try{
-  savedCode=localStorage.getItem('dt_last_code')||'';
-  savedDefects=JSON.parse(localStorage.getItem('dt_defects')||'[]');
-  savedProjName=localStorage.getItem('dt_proj_name')||'';
-  savedRels=JSON.parse(localStorage.getItem('dt_rels')||'{}');
+  S.loggedIn   = localStorage.getItem('dt_loggedIn')==='true';
+  S.savedCode  = localStorage.getItem('dt_last_code')||'';
+  S.savedDefects = JSON.parse(localStorage.getItem('dt_defects')||'[]');
+  S.savedProjName= localStorage.getItem('dt_proj_name')||'';
+  S.savedRels  = JSON.parse(localStorage.getItem('dt_rels')||'{}');
 }catch(e){}
 
 var defects=[],docB64=null,rels={},media={},xmlFiles={},selectedFile=null,currentProject=null;
 
 // ── INIT ──────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',function(){
-  // Auto-resume from localStorage — instant, no download needed
-  if(savedCode && savedDefects.length>0){
-    // Restore session from localStorage instantly
-    currentProject={id:savedCode, name:savedProjName};
-    rels=savedRels;
-    defects=savedDefects.map(function(d){
+  // Decide what to show based on login state — same pattern as safety violation tracker
+  if(!S.loggedIn){
+    // Not logged in — show login screen
+    showScr('scrLogin');
+  } else if(S.savedCode && S.savedDefects.length>0){
+    // Logged in + have saved project — restore instantly, no download
+    currentProject={id:S.savedCode, name:S.savedProjName};
+    rels=S.savedRels;
+    defects=S.savedDefects.map(function(d){
       return Object.assign({},d,{beforeImg:null,rId:d.beforeImgKey});
     });
-    // Show project screen immediately — no loading needed
     renderProject();
     showScr('scrList');
-    toast('Project restored — tap 🔄 to refresh photos','');
-    // Load before images in background
+    // Load before images + docx in background
     loadBeforeImgsBackground();
-  } else if(savedCode){
-    // Have code but no cached defects — need to download
-    document.getElementById('codeInput').value=savedCode;
+  } else if(S.savedCode){
+    // Logged in + have code but no cached defects — download
+    document.getElementById('codeInput').value=S.savedCode;
     joinProject(true);
+  } else {
+    // Logged in but no project — show home
+    showScr('scrHome');
   }
 
   var dz=document.getElementById('dropZone');
