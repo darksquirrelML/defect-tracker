@@ -121,7 +121,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
 <body>
 
 <!-- HOME -->
-<div class="scr" id="scrHome">
+<div class="scr on" id="scrHome">
   <div class="hdr"><div class="logo">Defect<span>Tracker</span></div></div>
   <div class="home">
     <div class="home-logo">
@@ -350,25 +350,17 @@ function compressImg(b64,mime){
 }
 
 // ── STATE ─────────────────────────────────────────────
+// State — loaded from localStorage synchronously before anything renders
 var defects=[],docB64=null,rels={},media={},xmlFiles={},selectedFile=null,currentProject=null;
+var savedCode='';
+try{ savedCode=localStorage.getItem('dt_last_code')||''; }catch(e){}
 
 // ── INIT ──────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',function(){
-  // Decide which screen to show on startup
-  try{
-    var lastCode=localStorage.getItem('dt_last_code');
-    if(lastCode){
-      // Has saved project — go straight to loading, skip home screen
-      document.getElementById('codeInput').value=lastCode;
-      showScr('scrLoad');
-      setLoad('Resuming…',lastCode,10);
-      joinProject(true);
-    } else {
-      // No saved project — show home screen
-      showScr('scrHome');
-    }
-  }catch(e){
-    showScr('scrHome');
+  // Auto-resume: if we have a saved code, go straight to loading project
+  if(savedCode){
+    document.getElementById('codeInput').value=savedCode;
+    joinProject(true);
   }
 
   var dz=document.getElementById('dropZone');
