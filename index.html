@@ -12,18 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="DefectTracker">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
-<script>
-// Run before page renders — hide home screen if we have a saved project
-try{
-  if(localStorage.getItem('dt_last_code')){
-    document.documentElement.classList.add('has-project');
-  }
-}catch(e){}
-</script>
 <style>
-/* Hide home screen instantly if we have a saved project — prevents flash */
-.has-project #scrHome { display: none !important; }
-.has-project #scrLoad { display: block !important; }
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
 :root{--bg:#080c14;--sur:#0f1521;--sur2:#162030;--bor:#1e2d42;--blu:#3b82f6;--grn:#10d9a0;--red:#f04f4f;--yel:#f59e0b;--txt:#e2e8f0;--mut:#4a6080;--r:12px;}
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -275,7 +264,12 @@ function db(path,method,body,retry){
 
 // Go home and clear saved code
 function goHome(){
-  try{ localStorage.removeItem('dt_last_code'); }catch(e){}
+  try{
+    localStorage.removeItem('dt_last_code');
+    localStorage.removeItem('dt_defects');
+    localStorage.removeItem('dt_proj_name');
+    localStorage.removeItem('dt_rels');
+  }catch(e){}
   var b=document.getElementById('resumeBanner');
   if(b) b.style.display='none';
   currentProject=null; defects=[]; docB64=null; xmlFiles={}; rels={}; media={};
@@ -284,7 +278,12 @@ function goHome(){
 
 // Switch to a different project
 function switchProject(){
-  try{ localStorage.removeItem('dt_last_code'); }catch(e){}
+  try{
+    localStorage.removeItem('dt_last_code');
+    localStorage.removeItem('dt_defects');
+    localStorage.removeItem('dt_proj_name');
+    localStorage.removeItem('dt_rels');
+  }catch(e){}
   currentProject=null; defects=[]; docB64=null; xmlFiles={}; rels={}; media={};
   document.getElementById('codeInput').value='';
   showScr('scrHome');
@@ -304,6 +303,35 @@ function dismissResume(){
   try{ localStorage.removeItem('dt_last_code'); }catch(e){}
   var b=document.getElementById('resumeBanner');
   if(b) b.style.display='none';
+}
+
+// Load before images in background after instant restore
+function loadBeforeImgsBackground(){
+  if(!savedCode||!savedRels) return;
+  // Load storage files silently in background
+  Promise.all([
+    stoGet(savedCode+'/docx.b64').then(function(d){docB64=d;}).catch(function(){}),
+    stoGet(savedCode+'/xml.json').then(function(x){xmlFiles=JSON.parse(x);}).catch(function(){}),
+  ]).then(function(){
+    // Load before images for each defect
+    var loaded=0;
+    defects.forEach(function(d,i){
+      if(d.beforeImgKey&&savedRels[d.beforeImgKey]){
+        var fname=savedRels[d.beforeImgKey];
+        stoGet(savedCode+'/media/'+fname).then(function(b64){
+          var ext=fname.split('.').pop().toLowerCase();
+          d.beforeImg='data:image/'+(ext==='jpg'||ext==='jpeg'?'jpeg':ext)+';base64,'+b64;
+          media[fname]=b64;
+          // Update just this card's before photo slot
+          var card=document.getElementById('card-'+i);
+          if(card){
+            var bslot=card.querySelector('.pslot:first-child');
+            if(bslot) bslot.innerHTML='<img src="'+d.beforeImg+'" alt="Before"><div class="plbl lb">Before</div>';
+          }
+        }).catch(function(){});
+      }
+    });
+  }).catch(function(){});
 }
 
 // Wake up Supabase before doing real work
@@ -361,15 +389,35 @@ function compressImg(b64,mime){
 }
 
 // ── STATE ─────────────────────────────────────────────
-// State — loaded from localStorage synchronously before anything renders
+// State — load from localStorage synchronously (same pattern as safety violation tracker)
+var savedCode='', savedDefects=[], savedProjName='', savedRels={};
+try{
+  savedCode=localStorage.getItem('dt_last_code')||'';
+  savedDefects=JSON.parse(localStorage.getItem('dt_defects')||'[]');
+  savedProjName=localStorage.getItem('dt_proj_name')||'';
+  savedRels=JSON.parse(localStorage.getItem('dt_rels')||'{}');
+}catch(e){}
+
 var defects=[],docB64=null,rels={},media={},xmlFiles={},selectedFile=null,currentProject=null;
-var savedCode='';
-try{ savedCode=localStorage.getItem('dt_last_code')||''; }catch(e){}
 
 // ── INIT ──────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',function(){
-  // Auto-resume: if we have a saved code, go straight to loading project
-  if(savedCode){
+  // Auto-resume from localStorage — instant, no download needed
+  if(savedCode && savedDefects.length>0){
+    // Restore session from localStorage instantly
+    currentProject={id:savedCode, name:savedProjName};
+    rels=savedRels;
+    defects=savedDefects.map(function(d){
+      return Object.assign({},d,{beforeImg:null,rId:d.beforeImgKey});
+    });
+    // Show project screen immediately — no loading needed
+    renderProject();
+    showScr('scrList');
+    toast('Project restored — tap 🔄 to refresh photos','');
+    // Load before images in background
+    loadBeforeImgsBackground();
+  } else if(savedCode){
+    // Have code but no cached defects — need to download
     document.getElementById('codeInput').value=savedCode;
     joinProject(true);
   }
@@ -662,8 +710,21 @@ function renderProject(){
   document.getElementById('projName').textContent=currentProject.name;
   document.getElementById('projCode').textContent=currentProject.id;
   renderCards();updateStats();
-  // Save last project code to localStorage
-  try{ localStorage.setItem('dt_last_code', currentProject.id); }catch(e){}
+  // Save full session to localStorage — so reload is instant
+  try{
+    localStorage.setItem('dt_last_code', currentProject.id);
+    // Save defect list without beforeImg (too large) — just metadata + afterImg
+    var toSave=defects.map(function(d){
+      return{tblIdx:d.tblIdx,num:d.num,desc:d.desc,location:d.location,
+             origCx:d.origCx,origCy:d.origCy,afterTcPr:d.afterTcPr,
+             injectRow:d.injectRow,injectCell:d.injectCell,
+             beforeImgKey:d.rId,existingAfterRid:d.existingAfterRid||null,
+             afterImg:d.afterImg||null};
+    });
+    localStorage.setItem('dt_defects', JSON.stringify(toSave));
+    localStorage.setItem('dt_proj_name', currentProject.name);
+    localStorage.setItem('dt_rels', JSON.stringify(rels));
+  }catch(e){}
 }
 function renderCards(){
   var g=document.getElementById('grid');g.innerHTML='';
@@ -709,6 +770,17 @@ function handlePhoto(e,i){
   r.onload=function(ev){
     var url=ev.target.result,b64=url.split(',')[1];
     defects[i].afterImg=url;
+    // Update localStorage so reload restores after photos too
+    try{
+      var toSave=defects.map(function(d){
+        return{tblIdx:d.tblIdx,num:d.num,desc:d.desc,location:d.location,
+               origCx:d.origCx,origCy:d.origCy,afterTcPr:d.afterTcPr,
+               injectRow:d.injectRow,injectCell:d.injectCell,
+               beforeImgKey:d.rId,existingAfterRid:d.existingAfterRid||null,
+               afterImg:d.afterImg||null};
+      });
+      localStorage.setItem('dt_defects',JSON.stringify(toSave));
+    }catch(e){}
     var aslot=document.getElementById('aslot-'+i);
     if(aslot) aslot.innerHTML='<img src="'+url+'" alt="After"><div class="plbl la">After</div>';
     var card=document.getElementById('card-'+i);
