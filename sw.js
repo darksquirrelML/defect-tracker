@@ -1,5 +1,5 @@
-// Defect Tracker Service Worker v2.1
-var CACHE = 'defect-tracker-v2';
+// Defect Tracker Service Worker v2.2
+var CACHE = 'defect-tracker-v3';
 var ASSETS = [
   '/defect-tracker/',
   '/defect-tracker/index.html',
@@ -28,8 +28,13 @@ self.addEventListener('fetch', function(e){
   if(e.request.url.includes('supabase.co')||e.request.url.includes('cdnjs')||e.request.url.includes('fonts.googleapis')){
     e.respondWith(fetch(e.request).catch(function(){return caches.match(e.request);}));
   } else {
-    e.respondWith(
-      caches.match(e.request).then(function(r){ return r || fetch(e.request); })
-    );
+    // Always fetch fresh for HTML files
+    if(e.request.url.endsWith('.html') || e.request.url.endsWith('/')){
+      e.respondWith(fetch(e.request).catch(function(){return caches.match(e.request);}));
+    } else {
+      e.respondWith(
+        caches.match(e.request).then(function(r){ return r || fetch(e.request); })
+      );
+    }
   }
 });
