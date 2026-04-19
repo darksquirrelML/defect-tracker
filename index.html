@@ -12,7 +12,18 @@
 <meta name="apple-mobile-web-app-title" content="DefectTracker">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
+<script>
+// Run before page renders — hide home screen if we have a saved project
+try{
+  if(localStorage.getItem('dt_last_code')){
+    document.documentElement.classList.add('has-project');
+  }
+}catch(e){}
+</script>
 <style>
+/* Hide home screen instantly if we have a saved project — prevents flash */
+.has-project #scrHome { display: none !important; }
+.has-project #scrLoad { display: block !important; }
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
 :root{--bg:#080c14;--sur:#0f1521;--sur2:#162030;--bor:#1e2d42;--blu:#3b82f6;--grn:#10d9a0;--red:#f04f4f;--yel:#f59e0b;--txt:#e2e8f0;--mut:#4a6080;--r:12px;}
 *{box-sizing:border-box;margin:0;padding:0;}
