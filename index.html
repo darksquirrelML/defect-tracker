@@ -378,31 +378,69 @@ function dismissResume(){
 
 // Load before images in background after instant restore
 function loadBeforeImgsBackground(){
-  if(!savedCode||!savedRels) return;
-  // Load storage files silently in background
-  Promise.all([
-    stoGet(savedCode+'/docx.b64').then(function(d){docB64=d;}).catch(function(){}),
-    stoGet(savedCode+'/xml.json').then(function(x){xmlFiles=JSON.parse(x);}).catch(function(){}),
-  ]).then(function(){
-    // Load before images for each defect
-    var loaded=0;
-    defects.forEach(function(d,i){
-      if(d.beforeImgKey&&savedRels[d.beforeImgKey]){
-        var fname=savedRels[d.beforeImgKey];
-        stoGet(savedCode+'/media/'+fname).then(function(b64){
-          var ext=fname.split('.').pop().toLowerCase();
-          d.beforeImg='data:image/'+(ext==='jpg'||ext==='jpeg'?'jpeg':ext)+';base64,'+b64;
-          media[fname]=b64;
-          // Update just this card's before photo slot
-          var card=document.getElementById('card-'+i);
-          if(card){
-            var bslot=card.querySelector('.pslot:first-child');
-            if(bslot) bslot.innerHTML='<img src="'+d.beforeImg+'" alt="Before"><div class="plbl lb">Before</div>';
-          }
-        }).catch(function(){});
-      }
-    });
+  var code=S.savedCode||currentProject&&currentProject.id;
+  var relsMap=S.savedRels||rels;
+  if(!code||!relsMap) return;
+
+  // Load docx + xml in background (needed for report generation)
+  stoGet(code+'/docx.b64').then(function(d){docB64=d;}).catch(function(){});
+  stoGet(code+'/xml.json').then(function(x){
+    try{xmlFiles=JSON.parse(x);}catch(e){}
   }).catch(function(){});
+
+  // Load before images — pending defects first, then done ones
+  var pending=[], done=[];
+  defects.forEach(function(d,i){
+    if(d.beforeImgKey&&relsMap[d.beforeImgKey]){
+      if(!d.afterImg) pending.push({d:d,i:i});
+      else done.push({d:d,i:i});
+    }
+  });
+
+  // Load pending first (workers need these), then done
+  var queue=pending.concat(done);
+  var idx=0;
+
+  function loadNext(){
+    if(idx>=queue.length) return;
+    var item=queue[idx++];
+    var d=item.d, i=item.i;
+    var fname=relsMap[d.beforeImgKey];
+    if(!fname){loadNext();return;}
+
+    // Check localStorage cache first
+    try{
+      var cached=localStorage.getItem('dt_img_'+d.beforeImgKey);
+      if(cached){
+        d.beforeImg=cached;
+        updateCardBefore(i,cached);
+        loadNext();
+        return;
+      }
+    }catch(e){}
+
+    stoGet(code+'/media/'+fname).then(function(b64){
+      var ext=fname.split('.').pop().toLowerCase();
+      var dataUrl='data:image/'+(ext==='jpg'||ext==='jpeg'?'jpeg':ext)+';base64,'+b64;
+      d.beforeImg=dataUrl;
+      media[fname]=b64;
+      updateCardBefore(i,dataUrl);
+      // Cache in localStorage for next time
+      try{ localStorage.setItem('dt_img_'+d.beforeImgKey, dataUrl); }catch(e){}
+      loadNext();
+    }).catch(function(){ loadNext(); });
+  }
+
+  // Load 3 at a time
+  loadNext(); loadNext(); loadNext();
+}
+
+function updateCardBefore(i, dataUrl){
+  var card=document.getElementById('card-'+i);
+  if(card){
+    var bslot=card.querySelector('.pslot:first-child');
+    if(bslot) bslot.innerHTML='<img src="'+dataUrl+'" alt="Before"><div class="plbl lb">Before</div>';
+  }
 }
 
 // Wake up Supabase before doing real work
