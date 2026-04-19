@@ -1,5 +1,5 @@
-// Defect Tracker Service Worker
-var CACHE = 'defect-tracker-v1';
+// Defect Tracker Service Worker v2.1
+var CACHE = 'defect-tracker-v2';
 var ASSETS = [
   '/defect-tracker/',
   '/defect-tracker/index.html',
@@ -25,11 +25,9 @@ self.addEventListener('activate', function(e){
 });
 
 self.addEventListener('fetch', function(e){
-  // Network first for Supabase API and CDN calls
-  if(e.request.url.includes('supabase.co') || e.request.url.includes('cdnjs') || e.request.url.includes('fonts.googleapis')){
+  if(e.request.url.includes('supabase.co')||e.request.url.includes('cdnjs')||e.request.url.includes('fonts.googleapis')){
     e.respondWith(fetch(e.request).catch(function(){return caches.match(e.request);}));
   } else {
-    // Cache first for app assets
     e.respondWith(
       caches.match(e.request).then(function(r){ return r || fetch(e.request); })
     );
