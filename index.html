@@ -213,7 +213,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
     <div class="stat"><div class="dot d-r"></div><div><div class="sl">Pending</div><div class="sv" id="sP">0</div></div></div>
     <div class="prog"><div class="sl">Progress</div><div class="pbar"><div class="pfil" id="pF"></div></div></div>
     <div class="bbtns">
-      <span id="photoLoadInd" style="display:none;font-size:11px;color:var(--mut);margin-right:6px;"></span>
       <button class="btn b-gst b-sm" onclick="refreshPhotos()">🔄</button>
       <button class="btn b-grn b-sm" onclick="showGen()">📥 Report</button>
     </div>
@@ -444,65 +443,76 @@ function updateCardBefore(i, dataUrl){
   }
 }
 
-// Load before photos in batches of 50
-function loadBeforeImgsBatch(code, relsMap, start){
+function loadAfterPhotosBatch(code, total, offset){
+  var LIMIT=20;
+  return db('dt_after_photos?project_id=eq.'+encodeURIComponent(code)+'&select=tbl_idx,photo_b64&limit='+LIMIT+'&offset='+offset)
+    .then(function(photos){
+      if(photos&&photos.length){
+        photos.forEach(function(p){
+          var d=defects.find(function(x){return x.tblIdx===p.tbl_idx;});
+          if(d) d.afterImg='data:image/jpeg;base64,'+p.photo_b64;
+        });
+        setLoad('Loading after photos…',photos.length+' loaded',75);
+        if(photos.length===LIMIT){
+          // More to load
+          return loadAfterPhotosBatch(code, total, offset+LIMIT);
+        }
+      }
+      return Promise.resolve();
+    }).catch(function(e){
+      console.error('After photo batch error:',e);
+      return Promise.resolve(); // continue even if batch fails
+    });
+}
+
+function loadBeforeImgsBatch(code,relsMap,start){
   var BATCH=50;
-  // Build full queue on first call
   if(start===0){
-    window._imgQueue=[];
+    window._imgQ=[];
     defects.forEach(function(d,i){
       if(d.beforeImgKey&&relsMap[d.beforeImgKey])
-        window._imgQueue.push({d:d,i:i,fname:relsMap[d.beforeImgKey]});
+        window._imgQ.push({d:d,i:i,fname:relsMap[d.beforeImgKey]});
     });
-    // Pending first
-    window._imgQueue.sort(function(a,b){return (a.d.afterImg?1:0)-(b.d.afterImg?1:0);});
-    // Show indicator
+    window._imgQ.sort(function(a,b){return (a.d.afterImg?1:0)-(b.d.afterImg?1:0);});
     var ind=document.getElementById('photoLoadInd');
-    if(ind&&window._imgQueue.length>0){ind.style.display='inline';ind.textContent='📷 0/'+window._imgQueue.length;}
+    if(ind&&window._imgQ.length>0){ind.style.display='inline';ind.textContent='📷 0/'+window._imgQ.length;}
   }
-  var queue=window._imgQueue||[];
-  if(start>=queue.length){
+  var q=window._imgQ||[];
+  if(start>=q.length){
     var ind=document.getElementById('photoLoadInd');
-    if(ind) ind.style.display='none';
+    if(ind)ind.style.display='none';
     return;
   }
-  var batch=queue.slice(start,start+BATCH);
-  var loaded=start;
-  Promise.all(batch.map(function(item){
+  Promise.all(q.slice(start,start+BATCH).map(function(item){
     var d=item.d,i=item.i,fname=item.fname;
-    // Check cache first
     try{
-      var cached=localStorage.getItem('dt_img_'+d.beforeImgKey);
-      if(cached){
-        d.beforeImg=cached;
-        var card=document.getElementById('card-'+i);
-        if(card){var s=card.querySelector('.pslot:first-child');if(s)s.innerHTML='<img src="'+cached+'" alt="Before"><div class="plbl lb">Before</div>';}
-        loaded++;
-        return Promise.resolve();
-      }
+      var c=localStorage.getItem('dt_img_'+d.beforeImgKey);
+      if(c){d.beforeImg=c;var card=document.getElementById('card-'+i);if(card){var s=card.querySelector('.pslot:first-child');if(s)s.innerHTML='<img src="'+c+'" alt="Before"><div class="plbl lb">Before</div>';}return Promise.resolve();}
     }catch(e){}
     return stoGet(code+'/media/'+fname).then(function(b64){
       var ext=fname.split('.').pop().toLowerCase();
       var url='data:image/'+(ext==='jpg'||ext==='jpeg'?'jpeg':ext)+';base64,'+b64;
-      d.beforeImg=url; media[fname]=b64;
+      d.beforeImg=url;media[fname]=b64;
       var card=document.getElementById('card-'+i);
       if(card){var s=card.querySelector('.pslot:first-child');if(s)s.innerHTML='<img src="'+url+'" alt="Before"><div class="plbl lb">Before</div>';}
       try{localStorage.setItem('dt_img_'+d.beforeImgKey,url);}catch(e){}
-      loaded++;
-    }).catch(function(){loaded++;});
+    }).catch(function(){});
   })).then(function(){
     var ind=document.getElementById('photoLoadInd');
-    if(ind) ind.textContent='📷 '+(start+batch.length)+'/'+queue.length;
+    if(ind)ind.textContent='📷 '+(start+Math.min(BATCH,q.length-start))+'/'+q.length;
     setTimeout(function(){loadBeforeImgsBatch(code,relsMap,start+BATCH);},300);
   });
 }
 
 // Wake up Supabase before doing real work
 function wakeUp(){
-  // Ping Supabase up to 3 times with increasing delays
+  // Ping BOTH tables to wake them up before real queries
   function ping(attempt){
-    return db('dt_projects?limit=1&select=id').then(function(){
-      return {}; // success
+    return Promise.all([
+      db('dt_projects?limit=1&select=id').catch(function(){return{};}),
+      db('dt_after_photos?limit=1&select=id').catch(function(){return{};})
+    ]).then(function(){
+      return {};
     }).catch(function(){
       if(attempt>=3) return {}; // give up after 3 tries
       var delay=attempt*2000; // 2s, 4s
@@ -790,23 +800,16 @@ function joinProject(isAuto){
     var proj=rows[0];
     rels=proj.rels;
     currentProject={id:code,name:proj.name};
-    // Load docx+xml in background (needed for report generation)
+    // Load docx+xml in background (needed for report)
     stoGet(code+'/docx.b64').then(function(d){docB64=d;}).catch(function(){});
     stoGet(code+'/xml.json').then(function(x){try{xmlFiles=JSON.parse(x);}catch(e){}}).catch(function(){});
-    // Skip loading before photos here - load them in background 50 at a time
-    setLoad('Loading after photos…','',60);
-    // Just build defects with no before images - they load in background
+    // Build defects without before images first
     defects=proj.defects.map(function(d){
       return Object.assign({},d,{beforeImg:null,afterImg:null,rId:d.beforeImgKey});
     });
-    return db('dt_after_photos?project_id=eq.'+encodeURIComponent(code)+'&select=tbl_idx,photo_b64').then(function(photos){
-      if(photos&&photos.length){
-        photos.forEach(function(p){
-          var d=defects.find(function(x){return x.tblIdx===p.tbl_idx;});
-          if(d) d.afterImg='data:image/jpeg;base64,'+p.photo_b64;
-        });
-      }
-      // Save to localStorage for next time
+    setLoad('Loading after photos…','',70);
+    // Fetch after photos in batches of 20 to avoid timeout
+    return loadAfterPhotosBatch(code, proj.defects.length, 0).then(function(){
       try{
         localStorage.setItem('dt_last_code',code);
         localStorage.setItem('dt_proj_name',proj.name);
@@ -815,10 +818,8 @@ function joinProject(isAuto){
       }catch(e){}
       setLoad('Ready!','',100);
       setTimeout(function(){
-        renderProject();
-        showScr('scrList');
-        // Load before photos 50 at a time in background
-        loadBeforeImgsBatch(code, rels, 0);
+        renderProject(); showScr('scrList');
+        loadBeforeImgsBatch(code,rels,0);
       },300);
     });
     }).catch(function(e){console.error(e);toast('Error: '+e.message,'r');showScr('scrHome');});
