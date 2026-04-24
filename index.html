@@ -618,14 +618,54 @@ window.addEventListener('DOMContentLoaded',function(){
     // Not logged in — show login screen
     showScr('scrLogin');
   } else if(S.savedCode && S.savedDefects.length>0){
-    // Logged in + have saved project — restore instantly, no download
+    // Logged in + have saved project
     currentProject={id:S.savedCode, name:S.savedProjName};
     rels=S.savedRels;
     defects=S.savedDefects.map(function(d){
       return Object.assign({},d,{beforeImg:null,rId:d.beforeImgKey});
     });
+    // Show cards immediately from localStorage
     renderProject();
     showScr('scrList');
+    // Always re-fetch after photos from Supabase to get latest
+    db('dt_after_photos?project_id=eq.'+encodeURIComponent(S.savedCode)+'&select=tbl_idx,photo_b64')
+      .then(function(photos){
+        if(photos&&photos.length){
+          var updated=0;
+          photos.forEach(function(p){
+            var d=defects.find(function(x){return x.tblIdx===p.tbl_idx;});
+            if(d){
+              var newUrl='data:image/jpeg;base64,'+p.photo_b64;
+              if(d.afterImg!==newUrl){ d.afterImg=newUrl; updated++; }
+            }
+          });
+          if(updated>0){
+            // Update cards that changed
+            defects.forEach(function(d,i){
+              var card=document.getElementById('card-'+i);
+              if(card&&d.afterImg){
+                card.className='card dn';
+                var badge=card.querySelector('.badge');
+                if(badge){badge.className='badge b-done';badge.textContent='✓ Done';}
+                var aslot=document.getElementById('aslot-'+i);
+                if(aslot) aslot.innerHTML='<img src="'+d.afterImg+'" alt="After"><div class="plbl la">After</div>';
+              }
+            });
+            updateStats();
+            // Update localStorage with latest
+            try{
+              var toSave=defects.map(function(d){
+                return{tblIdx:d.tblIdx,num:d.num,desc:d.desc,location:d.location,
+                       origCx:d.origCx,origCy:d.origCy,afterTcPr:d.afterTcPr,
+                       injectRow:d.injectRow,injectCell:d.injectCell,
+                       beforeImgKey:d.rId,existingAfterRid:d.existingAfterRid||null,
+                       afterImg:d.afterImg||null};
+              });
+              localStorage.setItem('dt_defects',JSON.stringify(toSave));
+            }catch(e){}
+          }
+        }
+      }).catch(function(){});
     // Load before images + docx in background
     loadBeforeImgsBackground();
   } else if(S.savedCode){
