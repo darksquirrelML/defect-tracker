@@ -214,7 +214,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
     <div class="prog"><div class="sl">Progress</div><div class="pbar"><div class="pfil" id="pF"></div></div></div>
     <div class="bbtns">
       <span id="photoLoadInd" style="display:none;font-size:11px;color:var(--mut);"></span>
-      <button class="btn b-gst b-sm" onclick="refreshPhotos()">🔄</button>
+      <button class="btn b-gst b-sm" onclick="refreshPhotos()">🔄 Sync</button>
       <button class="btn b-grn b-sm" onclick="showGen()">📥 Report</button>
     </div>
   </div>
@@ -1056,18 +1056,63 @@ function handlePhoto(e,i){
 // ── REFRESH ────────────────────────────────────────────
 function refreshPhotos(){
   if(!currentProject) return;
-  toast('Refreshing…','');
+  var btn=document.querySelector('.bbtns .btn');
+  toast('Syncing with cloud…','');
   db('dt_after_photos?project_id=eq.'+encodeURIComponent(currentProject.id)+'&select=tbl_idx,photo_b64').then(function(photos){
     var updated=0;
+    // Reset all after photos first, then re-apply from Supabase
+    defects.forEach(function(d){ d.afterImg=null; });
     if(photos&&photos.length){
       photos.forEach(function(p){
         var d=defects.find(function(x){return x.tblIdx===p.tbl_idx;});
-        if(d&&!d.afterImg){d.afterImg='data:image/jpeg;base64,'+p.photo_b64;updated++;}
+        if(d){
+          d.afterImg='data:image/jpeg;base64,'+p.photo_b64;
+          updated++;
+        }
       });
     }
-    if(updated>0){renderCards();updateStats();toast(updated+' new photo(s) loaded ✓','g');}
-    else toast('Up to date','');
-  }).catch(function(){toast('Refresh failed','r');});
+    // Update all cards in place
+    defects.forEach(function(d,i){
+      var card=document.getElementById('card-'+i);
+      if(!card) return;
+      // Update card border
+      card.className='card'+(d.afterImg?' dn':'');
+      // Update badge
+      var badge=card.querySelector('.badge');
+      if(badge){ badge.className='badge '+(d.afterImg?'b-done':'b-pend'); badge.textContent=d.afterImg?'✓ Done':'Pending'; }
+      // Update after slot
+      var aslot=document.getElementById('aslot-'+i);
+      if(aslot){
+        if(d.afterImg){
+          aslot.innerHTML='<img src="'+d.afterImg+'" alt="After"><div class="plbl la">After</div>';
+        } else {
+          aslot.innerHTML='<div class="pempty"><div class="pei">📸</div><div>Tap to add</div></div><div class="plbl la">After</div>';
+        }
+      }
+      // Update buttons
+      var btnsDiv=document.getElementById('btns-'+i);
+      if(btnsDiv){
+        if(d.afterImg){
+          btnsDiv.innerHTML='<div class="cbtns"><label for="cam-'+i+'" class="btn b-gst b-sm">📷 Retake</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div><button class="btn b-red b-sm" style="width:100%;margin-top:6px;" onclick="deletePhoto('+i+')">🗑 Remove After Photo</button>';
+        } else {
+          btnsDiv.innerHTML='<div class="cbtns"><label for="cam-'+i+'" class="btn b-blu b-sm">📷 Camera</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div>';
+        }
+      }
+    });
+    updateStats();
+    // Save updated state to localStorage
+    try{
+      var toSave=defects.map(function(d){
+        return{tblIdx:d.tblIdx,num:d.num,desc:d.desc,location:d.location,
+               origCx:d.origCx,origCy:d.origCy,afterTcPr:d.afterTcPr,
+               injectRow:d.injectRow,injectCell:d.injectCell,
+               beforeImgKey:d.rId,existingAfterRid:d.existingAfterRid||null,
+               afterImg:d.afterImg||null};
+      });
+      localStorage.setItem('dt_defects',JSON.stringify(toSave));
+    }catch(e){}
+    toast(updated+' after photo(s) synced ✓','g');
+  }).catch(function(){toast('Sync failed — check internet','r');});
 }
 
 // ── STATS ──────────────────────────────────────────────
