@@ -614,10 +614,13 @@ var defects=[],docB64=null,rels={},media={},xmlFiles={},selectedFile=null,curren
 // ── INIT ──────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',function(){
   // Decide what to show based on login state — same pattern as safety violation tracker
-  if(!S.loggedIn){
-    // Not logged in — show login screen
+  if(!S.loggedIn && !S.savedCode){
+    // Not logged in AND no saved project — show login screen
     showScr('scrLogin');
   } else if(S.savedCode && S.savedDefects.length>0){
+    // Have saved project — restore directly (no login needed)
+    S.loggedIn=true;
+    try{ localStorage.setItem('dt_loggedIn','true'); }catch(e){}
     // Logged in + have saved project
     currentProject={id:S.savedCode, name:S.savedProjName};
     rels=S.savedRels;
