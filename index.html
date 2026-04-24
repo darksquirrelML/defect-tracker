@@ -328,7 +328,6 @@ function doLogin(){
       // This ensures delete button shows correctly
       document.getElementById('codeInput').value=S.savedCode;
       joinProject(true);
-      loadBeforeImgsBackground();
     } else if(S.savedCode){
       document.getElementById('codeInput').value=S.savedCode;
       joinProject(true);
@@ -534,23 +533,12 @@ window.addEventListener('DOMContentLoaded',function(){
   if(!S.loggedIn){
     // Not logged in — show login screen
     showScr('scrLogin');
-  } else if(S.savedCode && S.savedDefects.length>0){
-    // Logged in + have saved project — restore instantly, no download
-    currentProject={id:S.savedCode, name:S.savedProjName};
-    rels=S.savedRels;
-    defects=S.savedDefects.map(function(d){
-      return Object.assign({},d,{beforeImg:null,rId:d.beforeImgKey});
-    });
-    renderProject();
-    showScr('scrList');
-    // Load before images + docx in background
-    loadBeforeImgsBackground();
   } else if(S.savedCode){
-    // Logged in + have code but no cached defects — download
+    // Have saved code — joinProject loads after photos fresh (delete button works)
     document.getElementById('codeInput').value=S.savedCode;
     joinProject(true);
   } else {
-    // Logged in but no project — show home
+    // No saved project — show home
     showScr('scrHome');
   }
 
