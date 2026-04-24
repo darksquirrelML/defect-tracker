@@ -213,8 +213,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
     <div class="stat"><div class="dot d-r"></div><div><div class="sl">Pending</div><div class="sv" id="sP">0</div></div></div>
     <div class="prog"><div class="sl">Progress</div><div class="pbar"><div class="pfil" id="pF"></div></div></div>
     <div class="bbtns">
-      <span id="photoLoadInd" style="display:none;font-size:11px;color:var(--mut);"></span>
-      <button class="btn b-gst b-sm" onclick="refreshPhotos()">🔄 Sync</button>
+      <button class="btn b-gst b-sm" onclick="refreshPhotos()">🔄</button>
       <button class="btn b-grn b-sm" onclick="showGen()">📥 Report</button>
     </div>
   </div>
@@ -383,92 +382,57 @@ function loadBeforeImgsBackground(){
   var relsMap=S.savedRels||rels;
   if(!code||!relsMap) return;
 
-  // Load docx + xml silently (needed for report generation)
+  // Load docx + xml in background (needed for report generation)
   stoGet(code+'/docx.b64').then(function(d){docB64=d;}).catch(function(){});
   stoGet(code+'/xml.json').then(function(x){
     try{xmlFiles=JSON.parse(x);}catch(e){}
   }).catch(function(){});
 
-  // Build queue — pending first (workers need these), done after
-  var queue=[];
+  // Load before images — pending defects first, then done ones
+  var pending=[], done=[];
   defects.forEach(function(d,i){
-    if(d.beforeImgKey&&relsMap[d.beforeImgKey])
-      queue.push({d:d,i:i});
-  });
-  // Pending first
-  queue.sort(function(a,b){
-    return (a.d.afterImg?1:0)-(b.d.afterImg?1:0);
-  });
-
-  var total=queue.length;
-  var loaded=0;
-  var BATCH=50; // load 50 at a time
-  var batchStart=0;
-
-  function showBatchProgress(){
-    var pct=Math.round(loaded/total*100);
-    // Show progress in sumbar
-    var prog=document.getElementById('pF');
-    // Update a photo load indicator if exists
-    var ind=document.getElementById('photoLoadInd');
-    if(ind){
-      if(loaded>=total){
-        ind.style.display='none';
-      } else {
-        ind.textContent='Loading photos: '+loaded+'/'+total;
-      }
+    if(d.beforeImgKey&&relsMap[d.beforeImgKey]){
+      if(!d.afterImg) pending.push({d:d,i:i});
+      else done.push({d:d,i:i});
     }
-  }
+  });
 
-  function loadItem(item){
+  // Load pending first (workers need these), then done
+  var queue=pending.concat(done);
+  var idx=0;
+
+  function loadNext(){
+    if(idx>=queue.length) return;
+    var item=queue[idx++];
     var d=item.d, i=item.i;
     var fname=relsMap[d.beforeImgKey];
-    if(!fname) return Promise.resolve();
+    if(!fname){loadNext();return;}
 
-    // Check localStorage cache first — instant
+    // Check localStorage cache first
     try{
       var cached=localStorage.getItem('dt_img_'+d.beforeImgKey);
       if(cached){
         d.beforeImg=cached;
         updateCardBefore(i,cached);
-        loaded++;
-        showBatchProgress();
-        return Promise.resolve();
+        loadNext();
+        return;
       }
     }catch(e){}
 
-    return stoGet(code+'/media/'+fname).then(function(b64){
+    stoGet(code+'/media/'+fname).then(function(b64){
       var ext=fname.split('.').pop().toLowerCase();
       var dataUrl='data:image/'+(ext==='jpg'||ext==='jpeg'?'jpeg':ext)+';base64,'+b64;
       d.beforeImg=dataUrl;
       media[fname]=b64;
       updateCardBefore(i,dataUrl);
-      loaded++;
-      showBatchProgress();
-      // Cache for next time
-      try{ localStorage.setItem('dt_img_'+d.beforeImgKey,dataUrl); }catch(e){}
-    }).catch(function(){
-      loaded++;
-      showBatchProgress();
-    });
+      // Cache in localStorage for next time
+      try{ localStorage.setItem('dt_img_'+d.beforeImgKey, dataUrl); }catch(e){}
+      loadNext();
+    }).catch(function(){ loadNext(); });
   }
 
-  function loadBatch(start){
-    if(start>=total) return;
-    var batch=queue.slice(start, start+BATCH);
-    var ind=document.getElementById('photoLoadInd');
-    if(ind) ind.style.display='block';
-    // Load all in this batch concurrently
-    Promise.all(batch.map(function(item){ return loadItem(item); })).then(function(){
-      // Small pause between batches to avoid overwhelming
-      if(start+BATCH < total){
-        setTimeout(function(){ loadBatch(start+BATCH); }, 500);
-      }
-    });
-  }
-
-  // Start first batch
-  loadBatch(0);
+  // Load 3 at a time
+  loadNext(); loadNext(); loadNext();
 }
 
 function updateCardBefore(i, dataUrl){
@@ -477,52 +441,6 @@ function updateCardBefore(i, dataUrl){
     var bslot=card.querySelector('.pslot:first-child');
     if(bslot) bslot.innerHTML='<img src="'+dataUrl+'" alt="Before"><div class="plbl lb">Before</div>';
   }
-}
-
-// Load after photos from DB in background — fetch only tbl_idx first, then photos one by one
-function loadAfterPhotosBackground(code){
-  // First get just the tbl_idx list (tiny — no photo data)
-  db('dt_after_photos?project_id=eq.'+encodeURIComponent(code)+'&select=tbl_idx').then(function(rows){
-    if(!rows||!rows.length) return;
-    // Load each photo one by one
-    var idx=0;
-    function loadNext(){
-      if(idx>=rows.length) return saveAfterToStorage();
-      var tblIdx=rows[idx++].tbl_idx;
-      var d=defects.find(function(x){return x.tblIdx===tblIdx;});
-      if(!d||d.afterImg){loadNext();return;} // skip if already have it
-      db('dt_after_photos?project_id=eq.'+encodeURIComponent(code)+'&tbl_idx=eq.'+tblIdx+'&select=photo_b64').then(function(r){
-        if(r&&r[0]&&r[0].photo_b64){
-          d.afterImg='data:image/jpeg;base64,'+r[0].photo_b64;
-          // Update card
-          var i=defects.indexOf(d);
-          var aslot=document.getElementById('aslot-'+i);
-          if(aslot) aslot.innerHTML='<img src="'+d.afterImg+'" alt="After"><div class="plbl la">After</div>';
-          var card=document.getElementById('card-'+i);
-          if(card) card.className='card dn';
-          var badge=document.getElementById('badge-'+i);
-          if(badge){badge.className='badge b-done';badge.textContent='✓ Done';}
-          updateStats();
-        }
-        loadNext();
-      }).catch(function(){loadNext();});
-    }
-    loadNext();
-  }).catch(function(){});
-}
-
-function saveAfterToStorage(){
-  try{
-    var toSave=defects.map(function(d){
-      return{tblIdx:d.tblIdx,num:d.num,desc:d.desc,location:d.location,
-             origCx:d.origCx,origCy:d.origCy,afterTcPr:d.afterTcPr,
-             injectRow:d.injectRow,injectCell:d.injectCell,
-             beforeImgKey:d.rId,existingAfterRid:d.existingAfterRid||null,
-             afterImg:d.afterImg||null};
-    });
-    localStorage.setItem('dt_defects',JSON.stringify(toSave));
-    S.savedDefects=toSave;
-  }catch(e){}
 }
 
 // Wake up Supabase before doing real work
@@ -615,10 +533,10 @@ var defects=[],docB64=null,rels={},media={},xmlFiles={},selectedFile=null,curren
 window.addEventListener('DOMContentLoaded',function(){
   // Decide what to show based on login state — same pattern as safety violation tracker
   if(!S.loggedIn && !S.savedCode){
-    // Not logged in AND no saved project — show login screen
+    // No login, no saved project — show login screen
     showScr('scrLogin');
   } else if(S.savedCode){
-    // Have saved code — joinProject handles wakeup + load + render
+    // Have saved code — joinProject handles everything correctly
     S.loggedIn=true;
     try{ localStorage.setItem('dt_loggedIn','true'); }catch(e){}
     document.getElementById('codeInput').value=S.savedCode;
@@ -797,50 +715,50 @@ function joinProject(isAuto){
   if(!code){toast('Enter a project code','r');return;}
   showScr('scrLoad');
   setLoad('Connecting…',code,10);
-
   wakeUp().then(function(){
     setLoad('Loading project…','',25);
-    // Step 1: Load ONLY metadata from DB (fast — no images)
+    // Step 1: Load ONLY metadata from DB (fast)
     return db('dt_projects?id=eq.'+encodeURIComponent(code)+'&select=id,name,rels,defects');
   }).then(function(rows){
     if(!rows||!rows.length){toast('Project not found: '+code,'r');showScr('scrHome');return;}
     var proj=rows[0];
     rels=proj.rels;
     currentProject={id:code,name:proj.name};
-
-    setLoad('Loading project…','',60);
-    // Step 2: Show cards immediately — load after photos in background
-    defects=proj.defects.map(function(d){
-      return Object.assign({},d,{beforeImg:null,afterImg:null,rId:d.beforeImgKey});
-    });
-    // Check localStorage for cached after photos
-    try{
-      var cached=JSON.parse(localStorage.getItem('dt_defects')||'[]');
-      if(cached.length){
-        cached.forEach(function(c){
-          if(c.afterImg){
-            var d=defects.find(function(x){return x.tblIdx===c.tblIdx;});
-            if(d) d.afterImg=c.afterImg;
-          }
+    setLoad('Loading after photos…','',50);
+    // Step 2: Load after photos from DB (fast)
+    return db('dt_after_photos?project_id=eq.'+encodeURIComponent(code)+'&select=tbl_idx,photo_b64').then(function(photos){
+      // Build defects with after photos applied
+      defects=proj.defects.map(function(d){
+        return Object.assign({},d,{beforeImg:null,afterImg:null,rId:d.beforeImgKey});
+      });
+      if(photos&&photos.length){
+        photos.forEach(function(p){
+          var d=defects.find(function(x){return x.tblIdx===p.tbl_idx;});
+          if(d) d.afterImg='data:image/jpeg;base64,'+p.photo_b64;
         });
       }
-    }catch(e){}
-    setLoad('Ready!','',100);
-    return Promise.resolve().then(function(){
-      // Save metadata to localStorage
+      setLoad('Ready!','',100);
+      // Save to localStorage
       try{
         localStorage.setItem('dt_last_code',code);
         localStorage.setItem('dt_proj_name',proj.name);
         localStorage.setItem('dt_rels',JSON.stringify(rels));
-        S.savedCode=code; S.savedProjName=proj.name; S.savedRels=rels;
+        var toSave=defects.map(function(d){
+          return{tblIdx:d.tblIdx,num:d.num,desc:d.desc,location:d.location,
+                 origCx:d.origCx,origCy:d.origCy,afterTcPr:d.afterTcPr,
+                 injectRow:d.injectRow,injectCell:d.injectCell,
+                 beforeImgKey:d.rId,existingAfterRid:d.existingAfterRid||null,
+                 afterImg:d.afterImg||null};
+        });
+        localStorage.setItem('dt_defects',JSON.stringify(toSave));
+        S.savedCode=code; S.savedDefects=toSave;
+        S.savedProjName=proj.name; S.savedRels=rels;
       }catch(e){}
       setTimeout(function(){
         renderProject();
         showScr('scrList');
-        // Load before photos + docx in background
+        // Load docx+xml+before photos in background
         loadBeforeImgsBackground();
-        // Load after photos in background one by one
-        loadAfterPhotosBackground(code);
       },300);
     });
   }).catch(function(e){
@@ -1004,51 +922,19 @@ function handlePhoto(e,i){
 // ── REFRESH ────────────────────────────────────────────
 function refreshPhotos(){
   if(!currentProject) return;
-  var btn=document.querySelector('.bbtns .btn');
   toast('Syncing with cloud…','');
   db('dt_after_photos?project_id=eq.'+encodeURIComponent(currentProject.id)+'&select=tbl_idx,photo_b64').then(function(photos){
-    var updated=0;
-    // Reset all after photos first, then re-apply from Supabase
+    // Reset all then re-apply
     defects.forEach(function(d){ d.afterImg=null; });
+    var count=0;
     if(photos&&photos.length){
       photos.forEach(function(p){
         var d=defects.find(function(x){return x.tblIdx===p.tbl_idx;});
-        if(d){
-          d.afterImg='data:image/jpeg;base64,'+p.photo_b64;
-          updated++;
-        }
+        if(d){ d.afterImg='data:image/jpeg;base64,'+p.photo_b64; count++; }
       });
     }
-    // Update all cards in place
-    defects.forEach(function(d,i){
-      var card=document.getElementById('card-'+i);
-      if(!card) return;
-      // Update card border
-      card.className='card'+(d.afterImg?' dn':'');
-      // Update badge
-      var badge=card.querySelector('.badge');
-      if(badge){ badge.className='badge '+(d.afterImg?'b-done':'b-pend'); badge.textContent=d.afterImg?'✓ Done':'Pending'; }
-      // Update after slot
-      var aslot=document.getElementById('aslot-'+i);
-      if(aslot){
-        if(d.afterImg){
-          aslot.innerHTML='<img src="'+d.afterImg+'" alt="After"><div class="plbl la">After</div>';
-        } else {
-          aslot.innerHTML='<div class="pempty"><div class="pei">📸</div><div>Tap to add</div></div><div class="plbl la">After</div>';
-        }
-      }
-      // Update buttons
-      var btnsDiv=document.getElementById('btns-'+i);
-      if(btnsDiv){
-        if(d.afterImg){
-          btnsDiv.innerHTML='<div class="cbtns"><label for="cam-'+i+'" class="btn b-gst b-sm">📷 Retake</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div><button class="btn b-red b-sm" style="width:100%;margin-top:6px;" onclick="deletePhoto('+i+')">🗑 Remove After Photo</button>';
-        } else {
-          btnsDiv.innerHTML='<div class="cbtns"><label for="cam-'+i+'" class="btn b-blu b-sm">📷 Camera</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div>';
-        }
-      }
-    });
-    updateStats();
-    // Save updated state to localStorage
+    renderCards(); updateStats();
+    // Save to localStorage
     try{
       var toSave=defects.map(function(d){
         return{tblIdx:d.tblIdx,num:d.num,desc:d.desc,location:d.location,
@@ -1059,8 +945,8 @@ function refreshPhotos(){
       });
       localStorage.setItem('dt_defects',JSON.stringify(toSave));
     }catch(e){}
-    toast(updated+' after photo(s) synced ✓','g');
-  }).catch(function(){toast('Sync failed — check internet','r');});
+    toast(count+' after photos synced ✓','g');
+  }).catch(function(){toast('Sync failed','r');});
 }
 
 // ── STATS ──────────────────────────────────────────────
