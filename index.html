@@ -723,56 +723,26 @@ function joinProject(isAuto){
   var code=document.getElementById('codeInput').value.trim().toUpperCase();
   if(!code){toast('Enter a project code','r');return;}
   showScr('scrLoad');
-  if(isAuto){
-    setLoad('Resuming project…',code,10);
-  } else {
-    setLoad('Connecting to cloud…','Waking up server',10);
-  }
-  // Wake Supabase first (free tier sleeps after inactivity)
+  setLoad('Connecting…',code,10);
+
   wakeUp().then(function(){
-    setLoad('Loading project…',code,20);
-    return db('dt_projects?id=eq.'+encodeURIComponent(code)+'&select=id,name,rels,defects').then(function(rows){
+    setLoad('Loading project…','',25);
+    // Step 1: Load ONLY metadata from DB (fast — no images)
+    return db('dt_projects?id=eq.'+encodeURIComponent(code)+'&select=id,name,rels,defects');
+  }).then(function(rows){
     if(!rows||!rows.length){toast('Project not found: '+code,'r');showScr('scrHome');return;}
     var proj=rows[0];
     rels=proj.rels;
     currentProject={id:code,name:proj.name};
-    // Load large files from Storage
-    setLoad('Loading Word file…','',35);
-    return stoGet(code+'/docx.b64').then(function(d){
-      docB64=d;
-      setLoad('Loading XML…','',50);
-      return stoGet(code+'/xml.json');
-    }).then(function(x){
-      xmlFiles=JSON.parse(x);
-      setLoad('Loading photos…','',65);
-      // Load only the before photos we need (not all media)
-      var beforeRids={};
-      proj.defects.forEach(function(d){
-        if(d.beforeImgKey) beforeRids[d.beforeImgKey]=rels[d.beforeImgKey];
-        if(d.existingAfterRid) beforeRids[d.existingAfterRid]=rels[d.existingAfterRid];
-      });
-      var fnames=Object.values(beforeRids).filter(Boolean);
-      return Promise.all(fnames.map(function(fname){
-        return stoGet(code+'/media/'+fname).then(function(b64){
-          media[fname]=b64;
-        }).catch(function(){});
-      }));
-    }).then(function(){
+
+    setLoad('Loading after photos…','',50);
+    // Step 2: Load after photos from DB (small — just base64 strings)
+    return db('dt_after_photos?project_id=eq.'+encodeURIComponent(code)+'&select=tbl_idx,photo_b64').then(function(photos){
+      // Build defects WITHOUT before images — show cards immediately
       defects=proj.defects.map(function(d){
-        var beforeImg=null,existingAfterImg=null;
-        if(d.beforeImgKey&&rels[d.beforeImgKey]&&media[rels[d.beforeImgKey]]){
-          var fn=rels[d.beforeImgKey],ext=fn.split('.').pop().toLowerCase();
-          beforeImg='data:image/'+(ext==='jpg'||ext==='jpeg'?'jpeg':ext)+';base64,'+media[fn];
-        }
-        if(d.existingAfterRid&&rels[d.existingAfterRid]&&media[rels[d.existingAfterRid]]){
-          var fn2=rels[d.existingAfterRid],ext2=fn2.split('.').pop().toLowerCase();
-          existingAfterImg='data:image/'+(ext2==='jpg'||ext2==='jpeg'?'jpeg':ext2)+';base64,'+media[fn2];
-        }
-        return Object.assign({},d,{beforeImg:beforeImg,afterImg:existingAfterImg,rId:d.beforeImgKey});
+        return Object.assign({},d,{beforeImg:null,afterImg:null,rId:d.beforeImgKey});
       });
-      setLoad('Loading after photos…','',85);
-      return db('dt_after_photos?project_id=eq.'+encodeURIComponent(code)+'&select=tbl_idx,photo_b64');
-    }).then(function(photos){
+      // Apply after photos
       if(photos&&photos.length){
         photos.forEach(function(p){
           var d=defects.find(function(x){return x.tblIdx===p.tbl_idx;});
@@ -780,10 +750,34 @@ function joinProject(isAuto){
         });
       }
       setLoad('Ready!','',100);
-      setTimeout(function(){renderProject();showScr('scrList');},400);
+      // Save to localStorage for instant resume next time
+      try{
+        localStorage.setItem('dt_last_code',code);
+        localStorage.setItem('dt_proj_name',proj.name);
+        localStorage.setItem('dt_rels',JSON.stringify(rels));
+        var toSave=defects.map(function(d){
+          return{tblIdx:d.tblIdx,num:d.num,desc:d.desc,location:d.location,
+                 origCx:d.origCx,origCy:d.origCy,afterTcPr:d.afterTcPr,
+                 injectRow:d.injectRow,injectCell:d.injectCell,
+                 beforeImgKey:d.rId,existingAfterRid:d.existingAfterRid||null,
+                 afterImg:d.afterImg||null};
+        });
+        localStorage.setItem('dt_defects',JSON.stringify(toSave));
+        S.savedCode=code; S.savedDefects=toSave;
+        S.savedProjName=proj.name; S.savedRels=rels;
+      }catch(e){}
+      setTimeout(function(){
+        renderProject();
+        showScr('scrList');
+        // Load docx+xml+before photos in background (needed for report)
+        loadBeforeImgsBackground();
+      },300);
     });
-    }).catch(function(e){console.error(e);toast('Error: '+e.message,'r');showScr('scrHome');});
-  }).catch(function(e){console.error(e);toast('Error: '+e.message,'r');showScr('scrHome');});
+  }).catch(function(e){
+    console.error(e);
+    toast('Error: '+e.message,'r');
+    showScr('scrHome');
+  });
 }
 
 // ── PARSE DEFECTS — Universal ─────────────────────────
