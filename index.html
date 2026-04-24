@@ -330,6 +330,31 @@ function doLogin(){
       });
       renderProject(); showScr('scrList');
       loadBeforeImgsBackground();
+      // Re-fetch after photos to ensure delete buttons show correctly
+      db('dt_after_photos?project_id=eq.'+encodeURIComponent(S.savedCode)+'&select=tbl_idx,photo_b64').then(function(photos){
+        if(!photos||!photos.length) return;
+        var updated=false;
+        photos.forEach(function(p){
+          var d=defects.find(function(x){return x.tblIdx===p.tbl_idx;});
+          if(d&&!d.afterImg){
+            d.afterImg='data:image/jpeg;base64,'+p.photo_b64;
+            updated=true;
+            // Update this card
+            var card=document.getElementById('card-'+defects.indexOf(d));
+            if(card){
+              var i=defects.indexOf(d);
+              card.className='card dn';
+              var badge=card.querySelector('.badge');
+              if(badge){badge.className='badge b-done';badge.textContent='✓ Done';}
+              var aslot=document.getElementById('aslot-'+i);
+              if(aslot) aslot.innerHTML='<img src="'+d.afterImg+'" alt="After"><div class="plbl la">After</div>';
+              var btnsDiv=document.getElementById('btns-'+i);
+              if(btnsDiv) btnsDiv.innerHTML='<div class="cbtns"><label for="cam-'+i+'" class="btn b-gst b-sm">📷 Retake</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div><button class="btn b-red b-sm" style="width:100%;margin-top:6px;" onclick="deletePhoto('+i+')">🗑 Remove After Photo</button>';
+            }
+          }
+        });
+        if(updated) updateStats();
+      }).catch(function(){});
     } else if(S.savedCode){
       document.getElementById('codeInput').value=S.savedCode;
       joinProject(true);
