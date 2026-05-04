@@ -556,12 +556,12 @@ function stoGet(path){
   });
 }
 
-// Compress a base64 image to max 1024px, 70% jpeg
+// Compress a base64 image to max 800px, 70% jpeg
 function compressImg(b64,mime){
   return new Promise(function(resolve){
     var img=new Image();
     img.onload=function(){
-      var W=1024,H=1024,w=img.width,h=img.height;
+      var W=800,H=800,w=img.width,h=img.height;
       if(w>W){h=Math.round(h*W/w);w=W;}
       if(h>H){w=Math.round(w*H/h);h=H;}
       var c=document.createElement('canvas');
@@ -941,37 +941,49 @@ function handlePhoto(e,i){
   if(badge){badge.className='badge b-sync';badge.textContent='⏳ Saving…';}
   var r=new FileReader();
   r.onload=function(ev){
-    var url=ev.target.result,b64=url.split(',')[1];
-    defects[i].afterImg=url;
-    // Update localStorage so reload restores after photos too
-    try{
-      var toSave=defects.map(function(d){
-        return{tblIdx:d.tblIdx,num:d.num,desc:d.desc,location:d.location,
-               origCx:d.origCx,origCy:d.origCy,afterTcPr:d.afterTcPr,
-               injectRow:d.injectRow,injectCell:d.injectCell,
-               beforeImgKey:d.rId,existingAfterRid:d.existingAfterRid||null,
-               afterImg:d.afterImg||null};
+    // Compress to max 1024px / 70% JPEG before saving
+    var img=new Image();
+    img.onload=function(){
+      var MAX=1024,w=img.width,h=img.height;
+      if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}
+      if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}
+      var c=document.createElement('canvas');
+      c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      var url=c.toDataURL('image/jpeg',0.7);
+      var b64=url.split(',')[1];
+      defects[i].afterImg=url;
+      // Update localStorage
+      try{
+        var toSave=defects.map(function(d){
+          return{tblIdx:d.tblIdx,num:d.num,desc:d.desc,location:d.location,
+                 origCx:d.origCx,origCy:d.origCy,afterTcPr:d.afterTcPr,
+                 injectRow:d.injectRow,injectCell:d.injectCell,
+                 beforeImgKey:d.rId,existingAfterRid:d.existingAfterRid||null,
+                 afterImg:d.afterImg||null};
+        });
+        localStorage.setItem('dt_defects',JSON.stringify(toSave));
+      }catch(e){}
+      var aslot=document.getElementById('aslot-'+i);
+      if(aslot) aslot.innerHTML='<img src="'+url+'" alt="After"><div class="plbl la">After</div>';
+      var card=document.getElementById('card-'+i);
+      if(card) card.className='card dn';
+      var btnsDiv=document.getElementById('btns-'+i);
+      if(btnsDiv) btnsDiv.innerHTML='<div class="cbtns"><label for="cam-'+i+'" class="btn b-gst b-sm">📷 Retake</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div><button class="btn b-red b-sm" style="width:100%;margin-top:6px;" onclick="deletePhoto('+i+')">🗑 Remove After Photo</button>';
+      updateStats();
+      // Save to Supabase
+      db('dt_after_photos?project_id=eq.'+encodeURIComponent(currentProject.id)+'&tbl_idx=eq.'+defects[i].tblIdx,'DELETE').then(function(){
+        return db('dt_after_photos','POST',{project_id:currentProject.id,tbl_idx:defects[i].tblIdx,photo_b64:b64});
+      }).then(function(){
+        if(badge){badge.className='badge b-done';badge.textContent='✓ Done';}
+        toast('Saved to cloud ✓','g');
+      }).catch(function(err){
+        console.error(err);
+        if(badge){badge.className='badge b-done';badge.textContent='✓ Local';}
+        toast('Photo saved locally (check internet)','y');
       });
-      localStorage.setItem('dt_defects',JSON.stringify(toSave));
-    }catch(e){}
-    var aslot=document.getElementById('aslot-'+i);
-    if(aslot) aslot.innerHTML='<img src="'+url+'" alt="After"><div class="plbl la">After</div>';
-    var card=document.getElementById('card-'+i);
-    if(card) card.className='card dn';
-    var btnsDiv=document.getElementById('btns-'+i);
-    if(btnsDiv) btnsDiv.innerHTML='<div class="cbtns"><label for="cam-'+i+'" class="btn b-gst b-sm">📷 Retake</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div><button class="btn b-red b-sm" style="width:100%;margin-top:6px;" onclick="deletePhoto('+i+')">🗑 Remove After Photo</button>';
-    updateStats();
-    // Save to Supabase — delete old then insert new
-    db('dt_after_photos?project_id=eq.'+encodeURIComponent(currentProject.id)+'&tbl_idx=eq.'+defects[i].tblIdx,'DELETE').then(function(){
-      return db('dt_after_photos','POST',{project_id:currentProject.id,tbl_idx:defects[i].tblIdx,photo_b64:b64});
-    }).then(function(){
-      if(badge){badge.className='badge b-done';badge.textContent='✓ Done';}
-      toast('Saved to cloud ✓','g');
-    }).catch(function(err){
-      console.error(err);
-      if(badge){badge.className='badge b-done';badge.textContent='✓ Local';}
-      toast('Photo saved locally (check internet)','y');
-    });
+    };
+    img.src=ev.target.result;
   };
   r.readAsDataURL(f);
   e.target.value='';
