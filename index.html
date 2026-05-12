@@ -226,6 +226,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
       <button class="btn b-grn b-sm" onclick="showGen()">📥 Report</button>
     </div>
   </div>
+  <div class="pgbar" id="pgbarTop" style="display:none;">
+    <button class="pgnum" id="pgPrevTop" onclick="changePage(currentPage-1)">&#8592; Prev</button>
+    <div class="pgnums" id="pgNumsTop"></div>
+    <button class="pgnum" id="pgNextTop" onclick="changePage(currentPage+1)">Next &#8594;</button>
+    <div class="pginfo">Showing <span id="pgFromTop">1</span>&#8211;<span id="pgToTop">50</span> of <span id="pgTotalTop">0</span> defects</div>
+  </div>
   <div class="grid" id="grid"></div>
   <div class="pgbar" id="pgbar" style="display:none;">
     <button class="pgnum" id="pgPrev" onclick="changePage(currentPage-1)">&#8592; Prev</button>
@@ -575,18 +581,18 @@ function stoGet(path){
   });
 }
 
-// Compress a base64 image to max 800px, 70% jpeg
+// Compress a base64 image to max 1200px, 85% jpeg
 function compressImg(b64,mime){
   return new Promise(function(resolve){
     var img=new Image();
     img.onload=function(){
-      var W=800,H=800,w=img.width,h=img.height;
+      var W=1200,H=1200,w=img.width,h=img.height;
       if(w>W){h=Math.round(h*W/w);w=W;}
       if(h>H){w=Math.round(w*H/h);h=H;}
       var c=document.createElement('canvas');
       c.width=w;c.height=h;
       c.getContext('2d').drawImage(img,0,0,w,h);
-      resolve(c.toDataURL('image/jpeg',0.7).split(',')[1]);
+      resolve(c.toDataURL('image/jpeg',0.85).split(',')[1]);
     };
     img.onerror=function(){resolve(b64);};
     img.src='data:'+(mime||'image/jpeg')+';base64,'+b64;
@@ -950,24 +956,34 @@ function renderCards(){
   var pgbar=document.getElementById('pgbar');
   if(totalPages>1){
     pgbar.style.display='flex';
+    document.getElementById('pgbarTop').style.display='flex';
     document.getElementById('pgFrom').textContent=start+1;
     document.getElementById('pgTo').textContent=end;
     document.getElementById('pgTotal').textContent=total;
     document.getElementById('pgPrev').disabled=(currentPage===0);
     document.getElementById('pgNext').disabled=(currentPage>=totalPages-1);
-    var nums=document.getElementById('pgNums');
-    nums.innerHTML='';
-    for(var p=0;p<totalPages;p++){
-      (function(pg){
-        var btn=document.createElement('button');
-        btn.className='pgnum'+(pg===currentPage?' act':'');
-        btn.textContent=pg+1;
-        btn.onclick=function(){changePage(pg);};
-        nums.appendChild(btn);
-      })(p);
-    }
+    document.getElementById('pgPrevTop').disabled=(currentPage===0);
+    document.getElementById('pgNextTop').disabled=(currentPage>=totalPages-1);
+    document.getElementById('pgFromTop').textContent=start+1;
+    document.getElementById('pgToTop').textContent=end;
+    document.getElementById('pgTotalTop').textContent=total;
+    // Build page buttons for both bars
+    ['pgNums','pgNumsTop'].forEach(function(id){
+      var nums=document.getElementById(id);
+      nums.innerHTML='';
+      for(var p=0;p<totalPages;p++){
+        (function(pg){
+          var btn=document.createElement('button');
+          btn.className='pgnum'+(pg===currentPage?' act':'');
+          btn.textContent=pg+1;
+          btn.onclick=function(){changePage(pg);};
+          nums.appendChild(btn);
+        })(p);
+      }
+    });
   } else {
     pgbar.style.display='none';
+    document.getElementById('pgbarTop').style.display='none';
   }
 }
 function changePage(p){
