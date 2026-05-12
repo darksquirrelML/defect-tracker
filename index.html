@@ -118,6 +118,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
 .tg{border-color:var(--grn);color:var(--grn);}.tr{border-color:var(--red);color:var(--red);}.ty{border-color:var(--yel);color:var(--yel);}
 @keyframes fup{from{opacity:0;transform:translateX(-50%) translateY(8px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
 @media(max-width:480px){.grid{grid-template-columns:1fr;padding:10px;}.bbtns{width:100%;justify-content:flex-end;}.sumbar{gap:10px;}}
+/* Pagination */
+.pgbar{background:var(--sur);border-top:1px solid var(--bor);padding:10px 20px;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;}
+.pginfo{font-size:12px;color:var(--mut);font-family:'DM Mono',monospace;}
+.pginfo span{color:var(--txt);font-weight:700;}
+.pgnums{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;}
+.pgnum{background:var(--sur2);border:1px solid var(--bor);border-radius:6px;padding:5px 10px;font-size:12px;font-family:'DM Mono',monospace;color:var(--mut);cursor:pointer;transition:all .15s;}
+.pgnum:hover{border-color:var(--blu);color:var(--txt);}
+.pgnum.act{background:var(--blu);border-color:var(--blu);color:#fff;font-weight:700;}
+.pgnum:disabled{opacity:.35;cursor:not-allowed;}
 </style>
 </head>
 <body>
@@ -218,6 +227,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
     </div>
   </div>
   <div class="grid" id="grid"></div>
+  <div class="pgbar" id="pgbar" style="display:none;">
+    <button class="pgnum" id="pgPrev" onclick="changePage(currentPage-1)">&#8592; Prev</button>
+    <div class="pgnums" id="pgNums"></div>
+    <button class="pgnum" id="pgNext" onclick="changePage(currentPage+1)">Next &#8594;</button>
+    <div class="pginfo">Showing <span id="pgFrom">1</span>&#8211;<span id="pgTo">50</span> of <span id="pgTotal">0</span> defects</div>
+  </div>
 </div>
 
 <!-- GENERATE -->
@@ -468,11 +483,15 @@ function loadAfterPhotosBatch(code, total, offset){
 function loadBeforeImgsBatch(code,relsMap,start){
   var BATCH=50;
   if(start===0){
+    // Only load before images for the CURRENT page for speed
+    var pageStart=currentPage*PAGE_SIZE;
+    var pageEnd=Math.min(pageStart+PAGE_SIZE,defects.length);
     window._imgQ=[];
-    defects.forEach(function(d,i){
+    for(var i=pageStart;i<pageEnd;i++){
+      var d=defects[i];
       if(d.beforeImgKey&&relsMap[d.beforeImgKey])
         window._imgQ.push({d:d,i:i,fname:relsMap[d.beforeImgKey]});
-    });
+    }
     window._imgQ.sort(function(a,b){return (a.d.afterImg?1:0)-(b.d.afterImg?1:0);});
     var ind=document.getElementById('photoLoadInd');
     if(ind&&window._imgQ.length>0){ind.style.display='inline';ind.textContent='📷 0/'+window._imgQ.length;}
@@ -591,7 +610,7 @@ try{
   S.savedRels  = JSON.parse(localStorage.getItem('dt_rels')||'{}');
 }catch(e){}
 
-var defects=[],docB64=null,rels={},media={},xmlFiles={},selectedFile=null,currentProject=null;
+var defects=[],docB64=null,rels={},media={},xmlFiles={},selectedFile=null,currentProject=null,currentPage=0;
 
 // ── CLEAR STALE IMAGE CACHE (one-time fix for old cross-project keys) ──────────
 // Old cache keys were 'dt_img_rId8' (no project code) — these collide across projects.
@@ -896,6 +915,7 @@ function eLoc(t){
 
 // ── RENDER ────────────────────────────────────────────
 function renderProject(){
+  currentPage=0;
   document.getElementById('projName').textContent=currentProject.name;
   document.getElementById('projCode').textContent=currentProject.id;
   renderCards();updateStats();
@@ -915,9 +935,48 @@ function renderProject(){
     localStorage.setItem('dt_rels', JSON.stringify(rels));
   }catch(e){}
 }
+var PAGE_SIZE=50;
 function renderCards(){
-  var g=document.getElementById('grid');g.innerHTML='';
-  defects.forEach(function(d,i){g.appendChild(mkCard(d,i));});
+  var g=document.getElementById('grid');
+  g.innerHTML='';
+  var total=defects.length;
+  var totalPages=Math.ceil(total/PAGE_SIZE);
+  if(currentPage<0) currentPage=0;
+  if(currentPage>=totalPages) currentPage=Math.max(0,totalPages-1);
+  var start=currentPage*PAGE_SIZE;
+  var end=Math.min(start+PAGE_SIZE,total);
+  for(var i=start;i<end;i++) g.appendChild(mkCard(defects[i],i));
+  // Pagination bar
+  var pgbar=document.getElementById('pgbar');
+  if(totalPages>1){
+    pgbar.style.display='flex';
+    document.getElementById('pgFrom').textContent=start+1;
+    document.getElementById('pgTo').textContent=end;
+    document.getElementById('pgTotal').textContent=total;
+    document.getElementById('pgPrev').disabled=(currentPage===0);
+    document.getElementById('pgNext').disabled=(currentPage>=totalPages-1);
+    var nums=document.getElementById('pgNums');
+    nums.innerHTML='';
+    for(var p=0;p<totalPages;p++){
+      (function(pg){
+        var btn=document.createElement('button');
+        btn.className='pgnum'+(pg===currentPage?' act':'');
+        btn.textContent=pg+1;
+        btn.onclick=function(){changePage(pg);};
+        nums.appendChild(btn);
+      })(p);
+    }
+  } else {
+    pgbar.style.display='none';
+  }
+}
+function changePage(p){
+  var totalPages=Math.ceil(defects.length/PAGE_SIZE);
+  if(p<0||p>=totalPages) return;
+  currentPage=p;
+  renderCards();
+  window.scrollTo(0,0);
+  if(currentProject&&rels) loadBeforeImgsBatch(currentProject.id,rels,0);
 }
 function mkCard(d,i){
   var el=document.createElement('div');
@@ -1018,7 +1077,7 @@ function refreshPhotos(){
       });
     }
     if(updated>0){renderCards();updateStats();toast(updated+' new photo(s) loaded ✓','g');}
-    else toast('Up to date','');
+    else toast('Up to date ✓','');
   }).catch(function(){toast('Refresh failed','r');});
 }
 
