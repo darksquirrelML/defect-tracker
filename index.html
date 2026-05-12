@@ -410,7 +410,7 @@ function loadBeforeImgsBackground(){
 
     // Check localStorage cache first
     try{
-      var cached=localStorage.getItem('dt_img_'+d.beforeImgKey);
+      var cached=localStorage.getItem('dt_img_'+code+'_'+d.beforeImgKey);
       if(cached){
         d.beforeImg=cached;
         updateCardBefore(i,cached);
@@ -425,8 +425,8 @@ function loadBeforeImgsBackground(){
       d.beforeImg=dataUrl;
       media[fname]=b64;
       updateCardBefore(i,dataUrl);
-      // Cache in localStorage for next time
-      try{ localStorage.setItem('dt_img_'+d.beforeImgKey, dataUrl); }catch(e){}
+      // Cache in localStorage for next time (scoped to project code to avoid cross-project collision)
+      try{ localStorage.setItem('dt_img_'+code+'_'+d.beforeImgKey, dataUrl); }catch(e){}
       loadNext();
     }).catch(function(){ loadNext(); });
   }
@@ -486,7 +486,7 @@ function loadBeforeImgsBatch(code,relsMap,start){
   Promise.all(q.slice(start,start+BATCH).map(function(item){
     var d=item.d,i=item.i,fname=item.fname;
     try{
-      var c=localStorage.getItem('dt_img_'+d.beforeImgKey);
+      var c=localStorage.getItem('dt_img_'+code+'_'+d.beforeImgKey);
       if(c){d.beforeImg=c;var card=document.getElementById('card-'+i);if(card){var s=card.querySelector('.pslot:first-child');if(s)s.innerHTML='<img src="'+c+'" alt="Before"><div class="plbl lb">Before</div>';}return Promise.resolve();}
     }catch(e){}
     return stoGet(code+'/media/'+fname).then(function(b64){
@@ -495,7 +495,7 @@ function loadBeforeImgsBatch(code,relsMap,start){
       d.beforeImg=url;media[fname]=b64;
       var card=document.getElementById('card-'+i);
       if(card){var s=card.querySelector('.pslot:first-child');if(s)s.innerHTML='<img src="'+url+'" alt="Before"><div class="plbl lb">Before</div>';}
-      try{localStorage.setItem('dt_img_'+d.beforeImgKey,url);}catch(e){}
+      try{localStorage.setItem('dt_img_'+code+'_'+d.beforeImgKey,url);}catch(e){}
     }).catch(function(){});
   })).then(function(){
     var ind=document.getElementById('photoLoadInd');
@@ -592,6 +592,22 @@ try{
 }catch(e){}
 
 var defects=[],docB64=null,rels={},media={},xmlFiles={},selectedFile=null,currentProject=null;
+
+// ── CLEAR STALE IMAGE CACHE (one-time fix for old cross-project keys) ──────────
+// Old cache keys were 'dt_img_rId8' (no project code) — these collide across projects.
+// New keys are 'dt_img_PROJECTCODE_rId8'. Wipe any old-format keys on load.
+(function(){
+  try{
+    var toDelete=[];
+    for(var i=0;i<localStorage.length;i++){
+      var k=localStorage.key(i);
+      // Old format: dt_img_rId... (no underscore-separated project code in middle)
+      if(k&&k.startsWith('dt_img_r')){ toDelete.push(k); }
+    }
+    toDelete.forEach(function(k){ localStorage.removeItem(k); });
+    if(toDelete.length) console.log('Cleared '+toDelete.length+' stale cross-project image cache entries.');
+  }catch(e){}
+})();
 
 // ── INIT ──────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',function(){
