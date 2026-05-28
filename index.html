@@ -1114,67 +1114,45 @@ function showGen(){
 }
 function generateReport(){
   var btn=document.getElementById('dlBtn');
-  btn.disabled=true;btn.textContent='⏳ Loading…';
-  // Ensure docB64 is loaded (may still be fetching on phone)
-  var ensureDoc=docB64?Promise.resolve():stoGet(currentProject.id+'/docx.b64').then(function(d){docB64=d;});
-  // Re-fetch all after photos fresh from Supabase before generating
-  var fetchAll=db('dt_after_photos?project_id=eq.'+encodeURIComponent(currentProject.id)+'&select=tbl_idx,photo_b64')
-    .then(function(photos){
-      if(photos&&photos.length){
-        photos.forEach(function(p){
-          var d=defects.find(function(x){return x.tblIdx===p.tbl_idx;});
-          if(d) d.afterImg='data:image/jpeg;base64,'+p.photo_b64;
-        });
-      }
-    }).catch(function(){});
-  Promise.all([ensureDoc,fetchAll]).then(function(){
-    btn.textContent='⏳ Generating…';
-    JSZip.loadAsync(b64ToBuf(docB64)).then(function(zip){
-      // Read XML files DIRECTLY from the ZIP — never rely on xmlFiles which may be empty on phone
-      return Promise.all([
-        zip.file('word/document.xml').async('string'),
-        zip.file('word/_rels/document.xml.rels').async('string'),
-        zip.file('[Content_Types].xml')?zip.file('[Content_Types].xml').async('string'):Promise.resolve('')
-      ]).then(function(parts){
-        var docXml=parts[0],rXml=parts[1],ct=parts[2]||'';
-        var idRe=/Id="rId(\d+)"/g,idM,maxId=0;
-        while((idM=idRe.exec(rXml))!==null){var n=parseInt(idM[1]);if(n>maxId)maxId=n;}
-        var nextId=maxId+1,afterMap={};
-        defects.forEach(function(d){if(d.afterImg) afterMap[d.tblIdx]=d;});
-        var result='',lastIdx=0,tblIdx=0,tblRe=/<w:tbl>[\s\S]*?<\/w:tbl>/g,tM;
-        while((tM=tblRe.exec(docXml))!==null){
-          tblIdx++;result+=docXml.substring(lastIdx,tM.index);
-          var tbl=tM[0],def=afterMap[tblIdx];
-          if(def){
-            var b64=def.afterImg.split(',')[1],isJ=def.afterImg.indexOf('image/jpeg')>=0||def.afterImg.indexOf('image/jpg')>=0;
-            var ext=isJ?'jpeg':'png',fn='after_t'+tblIdx+'.'+ext;
-            zip.file('word/media/'+fn,b64,{base64:true});
-            var rId='rId'+nextId++;
-            rXml=rXml.replace('</Relationships>','<Relationship Id="'+rId+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/'+fn+'"/></Relationships>');
-            var cx=def.origCx||1440000,cy=def.origCy||1728000;
-            var rows=tbl.match(/<w:tr[\s\S]*?<\/w:tr>/g)||[];
-            var rIdx=def.injectRow;if(rIdx>=rows.length)rIdx=rows.length-1;
-            var cells=rows[rIdx].match(/<w:tc>[\s\S]*?<\/w:tc>/g)||[];
-            var cIdx=def.injectCell||1;
-            if(cells&&cells.length>cIdx){
-              var nc='<w:tc>'+(def.afterTcPr||'')+'<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r>'+mkImg(rId,cx,cy)+'</w:r></w:p></w:tc>';
-              tbl=tbl.replace(rows[rIdx],rows[rIdx].replace(cells[cIdx],nc));
-            }
-          }
-          result+=tbl;lastIdx=tM.index+tM[0].length;
+  btn.disabled=true;btn.textContent='⏳ Generating…';
+  JSZip.loadAsync(b64ToBuf(docB64)).then(function(zip){
+    var docXml=xmlFiles['word/document.xml'],rXml=xmlFiles['word/_rels/document.xml.rels'],ct=xmlFiles['[Content_Types].xml']||'';
+    var idRe=/Id="rId(\d+)"/g,idM,maxId=0;
+    while((idM=idRe.exec(rXml))!==null){var n=parseInt(idM[1]);if(n>maxId)maxId=n;}
+    var nextId=maxId+1,afterMap={};
+    defects.forEach(function(d){if(d.afterImg) afterMap[d.tblIdx]=d;});
+    var result='',lastIdx=0,tblIdx=0,tblRe=/<w:tbl>[\s\S]*?<\/w:tbl>/g,tM;
+    while((tM=tblRe.exec(docXml))!==null){
+      tblIdx++;result+=docXml.substring(lastIdx,tM.index);
+      var tbl=tM[0],def=afterMap[tblIdx];
+      if(def){
+        var b64=def.afterImg.split(',')[1],isJ=def.afterImg.indexOf('image/jpeg')>=0||def.afterImg.indexOf('image/jpg')>=0;
+        var ext=isJ?'jpeg':'png',fn='after_t'+tblIdx+'.'+ext;
+        zip.file('word/media/'+fn,b64,{base64:true});
+        var rId='rId'+nextId++;
+        rXml=rXml.replace('</Relationships>','<Relationship Id="'+rId+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/'+fn+'"/></Relationships>');
+        var cx=def.origCx||1440000,cy=def.origCy||1728000;
+        var rows=tbl.match(/<w:tr[\s\S]*?<\/w:tr>/g)||[];
+        var rIdx=def.injectRow;if(rIdx>=rows.length)rIdx=rows.length-1;
+        var cells=rows[rIdx].match(/<w:tc>[\s\S]*?<\/w:tc>/g)||[];
+        var cIdx=def.injectCell||1;
+        if(cells&&cells.length>cIdx){
+          var nc='<w:tc>'+(def.afterTcPr||'')+'<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r>'+mkImg(rId,cx,cy)+'</w:r></w:p></w:tc>';
+          tbl=tbl.replace(rows[rIdx],rows[rIdx].replace(cells[cIdx],nc));
         }
-        result+=docXml.substring(lastIdx);
-        if(ct.indexOf('image/jpeg')<0) ct=ct.replace('</Types>','<Default Extension="jpeg" ContentType="image/jpeg"/></Types>');
-        if(ct.indexOf('image/png')<0)  ct=ct.replace('</Types>','<Default Extension="png" ContentType="image/png"/></Types>');
-        zip.file('word/document.xml',result);zip.file('word/_rels/document.xml.rels',rXml);zip.file('[Content_Types].xml',ct);
-        return zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6},mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
-      });
-    }).then(function(blob){
-      var done=defects.filter(function(d){return d.afterImg;}).length;
-      dlBlob(blob,currentProject.name+'_'+done+'of'+defects.length+'.docx');
-      toast('Report downloaded ✓','g');btn.disabled=false;btn.textContent='📥 Download Report';
-    }).catch(function(e){toast('Error: '+e.message,'r');btn.disabled=false;btn.textContent='📥 Download Report';});
-  });
+      }
+      result+=tbl;lastIdx=tM.index+tM[0].length;
+    }
+    result+=docXml.substring(lastIdx);
+    if(ct.indexOf('image/jpeg')<0) ct=ct.replace('</Types>','<Default Extension="jpeg" ContentType="image/jpeg"/></Types>');
+    if(ct.indexOf('image/png')<0)  ct=ct.replace('</Types>','<Default Extension="png" ContentType="image/png"/></Types>');
+    zip.file('word/document.xml',result);zip.file('word/_rels/document.xml.rels',rXml);zip.file('[Content_Types].xml',ct);
+    return zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6},mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+  }).then(function(blob){
+    var done=defects.filter(function(d){return d.afterImg;}).length;
+    dlBlob(blob,currentProject.name+'_'+done+'of'+defects.length+'.docx');
+    toast('Report downloaded ✓','g');btn.disabled=false;btn.textContent='📥 Download Report';
+  }).catch(function(e){toast('Error: '+e.message,'r');btn.disabled=false;btn.textContent='📥 Download Report';});
 }
 function mkImg(rId,cx,cy){
   var id=rId.replace('rId','');
