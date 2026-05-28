@@ -877,13 +877,35 @@ function parseDefects(xml){
     for(var ri=0;ri<rows.length&&!found;ri++){
       var cells=rows[ri].match(/<w:tc>[\s\S]*?<\/w:tc>/g)||[];
       for(var ci=0;ci<cells.length-1&&!found;ci++){
-        var cell=cells[ci],nextCell=cells[ci+1];
+        var cell=cells[ci];
         var bRidM=cell.match(/r:embed="([^"]+)"/);
         if(!bRidM) continue;
-        // Check if right cell already has an after photo (partially completed Word file)
-        var aRidM=nextCell.match(/r:embed="([^"]+)"/);
         var cxM=cell.match(/cx="(\d+)"/),cyM=cell.match(/cy="(\d+)"/);
-        var tcPrM=nextCell.match(/<w:tcPr>[\s\S]*?<\/w:tcPr>/);
+        // Find the correct after-photo cell: scan right from ci+1 and find
+        // the FIRST cell that has no image (empty = the "Photo on Site" slot).
+        // This handles documents where multiple cells share the same before image.
+        var afterCellIdx=-1,aRidM=null,tcPrM=null;
+        for(var ai=ci+1;ai<cells.length;ai++){
+          var hasImg=cells[ai].match(/r:embed="([^"]+)"/);
+          if(!hasImg){
+            // Empty cell — this is the after photo slot
+            afterCellIdx=ai;
+            tcPrM=cells[ai].match(/<w:tcPr>[\s\S]*?<\/w:tcPr>/);
+            break;
+          } else {
+            // Cell has an image — could be an existing after photo (partially completed file)
+            // Only treat as after if it's a DIFFERENT rId from the before photo
+            if(hasImg[1]!==bRidM[1]){
+              afterCellIdx=ai;
+              aRidM=hasImg;
+              tcPrM=cells[ai].match(/<w:tcPr>[\s\S]*?<\/w:tcPr>/);
+              break;
+            }
+            // Same rId as before = another before photo cell, skip and keep looking
+          }
+        }
+        // If no empty cell found to the right, fall back to ci+1 (original behaviour)
+        if(afterCellIdx===-1) afterCellIdx=ci+1;
         var txts='',txRe=/<w:t[^>]*>([^<]*)<\/w:t>/g,tx;
         while((tx=txRe.exec(tbl))!==null) txts+=tx[1]+' ';
         txts=txts.replace(/\s+/g,' ').trim();
@@ -891,11 +913,11 @@ function parseDefects(xml){
         defects.push({
           tblIdx:tblIdx,num:num,desc:eDesc(txts),location:eLoc(txts),
           beforeImg:null,
-          afterImg:null,          // restored from media after upload
-          existingAfterRid:aRidM?aRidM[1]:null,  // rId of existing after photo in docx
+          afterImg:null,
+          existingAfterRid:aRidM?aRidM[1]:null,
           rId:bRidM[1],
           origCx:cxM?parseInt(cxM[1]):1440000,origCy:cyM?parseInt(cyM[1]):1728000,
-          afterTcPr:tcPrM?tcPrM[0]:'',injectRow:ri,injectCell:ci+1
+          afterTcPr:tcPrM?tcPrM[0]:'',injectRow:ri,injectCell:afterCellIdx
         });
         found=true;
       }
