@@ -1114,10 +1114,17 @@ function showGen(){
 }
 function generateReport(){
   var btn=document.getElementById('dlBtn');
-  btn.disabled=true;btn.textContent='⏳ Loading photos…';
-  // Re-fetch ALL after photos fresh from Supabase before generating
-  // This is critical on mobile where background loading may not have finished
-  var fetchAll=db('dt_after_photos?project_id=eq.'+encodeURIComponent(currentProject.id)+'&select=tbl_idx,photo_b64')
+  btn.disabled=true;btn.textContent='⏳ Loading…';
+  // Step 1: ensure docB64 is loaded (may still be fetching on phone/worker)
+  var ensureDoc = docB64
+    ? Promise.resolve()
+    : stoGet(currentProject.id+'/docx.b64').then(function(d){ docB64=d; });
+  // Step 2: ensure xmlFiles loaded
+  var ensureXml = (xmlFiles&&xmlFiles['word/document.xml'])
+    ? Promise.resolve()
+    : stoGet(currentProject.id+'/xml.json').then(function(x){ try{xmlFiles=JSON.parse(x);}catch(e){} });
+  // Step 3: re-fetch all after photos fresh from Supabase
+  var fetchAll = db('dt_after_photos?project_id=eq.'+encodeURIComponent(currentProject.id)+'&select=tbl_idx,photo_b64')
     .then(function(photos){
       if(photos&&photos.length){
         photos.forEach(function(p){
@@ -1125,8 +1132,8 @@ function generateReport(){
           if(d) d.afterImg='data:image/jpeg;base64,'+p.photo_b64;
         });
       }
-    }).catch(function(){/* use whatever is in memory */});
-  fetchAll.then(function(){
+    }).catch(function(){});
+  Promise.all([ensureDoc, ensureXml, fetchAll]).then(function(){
   btn.textContent='⏳ Generating…';
   JSZip.loadAsync(b64ToBuf(docB64)).then(function(zip){
     var docXml=xmlFiles['word/document.xml'],rXml=xmlFiles['word/_rels/document.xml.rels'],ct=xmlFiles['[Content_Types].xml']||'';
@@ -1166,7 +1173,7 @@ function generateReport(){
     dlBlob(blob,currentProject.name+'_'+done+'of'+defects.length+'.docx');
     toast('Report downloaded ✓','g');btn.disabled=false;btn.textContent='📥 Download Report';
   }).catch(function(e){toast('Error: '+e.message,'r');btn.disabled=false;btn.textContent='📥 Download Report';});
-  }); // end fetchAll.then
+  }); // end Promise.all([ensureDoc, ensureXml, fetchAll])
 }
 function mkImg(rId,cx,cy){
   var id=rId.replace('rId','');
