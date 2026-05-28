@@ -1114,7 +1114,20 @@ function showGen(){
 }
 function generateReport(){
   var btn=document.getElementById('dlBtn');
-  btn.disabled=true;btn.textContent='⏳ Generating…';
+  btn.disabled=true;btn.textContent='⏳ Loading photos…';
+  // Re-fetch ALL after photos fresh from Supabase before generating
+  // This is critical on mobile where background loading may not have finished
+  var fetchAll=db('dt_after_photos?project_id=eq.'+encodeURIComponent(currentProject.id)+'&select=tbl_idx,photo_b64')
+    .then(function(photos){
+      if(photos&&photos.length){
+        photos.forEach(function(p){
+          var d=defects.find(function(x){return x.tblIdx===p.tbl_idx;});
+          if(d) d.afterImg='data:image/jpeg;base64,'+p.photo_b64;
+        });
+      }
+    }).catch(function(){/* use whatever is in memory */});
+  fetchAll.then(function(){
+  btn.textContent='⏳ Generating…';
   JSZip.loadAsync(b64ToBuf(docB64)).then(function(zip){
     var docXml=xmlFiles['word/document.xml'],rXml=xmlFiles['word/_rels/document.xml.rels'],ct=xmlFiles['[Content_Types].xml']||'';
     var idRe=/Id="rId(\d+)"/g,idM,maxId=0;
@@ -1153,6 +1166,7 @@ function generateReport(){
     dlBlob(blob,currentProject.name+'_'+done+'of'+defects.length+'.docx');
     toast('Report downloaded ✓','g');btn.disabled=false;btn.textContent='📥 Download Report';
   }).catch(function(e){toast('Error: '+e.message,'r');btn.disabled=false;btn.textContent='📥 Download Report';});
+  }); // end fetchAll.then
 }
 function mkImg(rId,cx,cy){
   var id=rId.replace('rId','');
@@ -1233,9 +1247,31 @@ function hideMod(id){document.getElementById(id).classList.add('hi');}
 function setLoad(t,m,p){document.getElementById('lT').textContent=t;document.getElementById('lM').textContent=m;document.getElementById('lF').style.width=p+'%';}
 function b64ToBuf(b64){var bin=atob(b64),u=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u.buffer;}
 function dlBlob(blob,name){
-  var url=URL.createObjectURL(blob);
-  if(/iPad|iPhone|iPod/.test(navigator.userAgent)){window.open(url,'_blank');toast('Tap & hold → Save to Files','ty');setTimeout(function(){URL.revokeObjectURL(url);},60000);}
-  else{var a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(url);},5000);}
+  var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||
+             (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  var isAndroid=/Android/.test(navigator.userAgent);
+  if(isIOS){
+    // iOS Safari: convert to base64 data URI then open — blob URLs get killed on navigation
+    var reader=new FileReader();
+    reader.onloadend=function(){
+      var dataUrl=reader.result;
+      var a=document.createElement('a');
+      a.href=dataUrl;
+      a.download=name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast('Tap & hold the file → Save to Files','ty');
+    };
+    reader.readAsDataURL(blob);
+  } else {
+    // Desktop + Android Chrome: standard blob URL download
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url;a.download=name;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(function(){URL.revokeObjectURL(url);},10000);
+  }
 }
 var tT;
 function toast(msg,type){
