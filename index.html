@@ -118,15 +118,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
 .tg{border-color:var(--grn);color:var(--grn);}.tr{border-color:var(--red);color:var(--red);}.ty{border-color:var(--yel);color:var(--yel);}
 @keyframes fup{from{opacity:0;transform:translateX(-50%) translateY(8px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
 @media(max-width:480px){.grid{grid-template-columns:1fr;padding:10px;}.bbtns{width:100%;justify-content:flex-end;}.sumbar{gap:10px;}}
-/* Pagination */
-.pgbar{background:var(--sur);border-top:1px solid var(--bor);padding:10px 20px;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;}
-.pginfo{font-size:12px;color:var(--mut);font-family:'DM Mono',monospace;}
-.pginfo span{color:var(--txt);font-weight:700;}
-.pgnums{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;}
-.pgnum{background:var(--sur2);border:1px solid var(--bor);border-radius:6px;padding:5px 10px;font-size:12px;font-family:'DM Mono',monospace;color:var(--mut);cursor:pointer;transition:all .15s;}
-.pgnum:hover{border-color:var(--blu);color:var(--txt);}
-.pgnum.act{background:var(--blu);border-color:var(--blu);color:#fff;font-weight:700;}
-.pgnum:disabled{opacity:.35;cursor:not-allowed;}
 </style>
 </head>
 <body>
@@ -226,19 +217,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
       <button class="btn b-grn b-sm" onclick="showGen()">📥 Report</button>
     </div>
   </div>
-  <div class="pgbar" id="pgbarTop" style="display:none;">
-    <button class="pgnum" id="pgPrevTop" onclick="changePage(currentPage-1)">&#8592; Prev</button>
-    <div class="pgnums" id="pgNumsTop"></div>
-    <button class="pgnum" id="pgNextTop" onclick="changePage(currentPage+1)">Next &#8594;</button>
-    <div class="pginfo">Showing <span id="pgFromTop">1</span>&#8211;<span id="pgToTop">50</span> of <span id="pgTotalTop">0</span> defects</div>
-  </div>
   <div class="grid" id="grid"></div>
-  <div class="pgbar" id="pgbar" style="display:none;">
-    <button class="pgnum" id="pgPrev" onclick="changePage(currentPage-1)">&#8592; Prev</button>
-    <div class="pgnums" id="pgNums"></div>
-    <button class="pgnum" id="pgNext" onclick="changePage(currentPage+1)">Next &#8594;</button>
-    <div class="pginfo">Showing <span id="pgFrom">1</span>&#8211;<span id="pgTo">50</span> of <span id="pgTotal">0</span> defects</div>
-  </div>
 </div>
 
 <!-- GENERATE -->
@@ -281,8 +260,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 // ── SUPABASE ──────────────────────────────────────────
-var SURL='https://pyyncjesibtrilipsfhm.supabase.co';
-var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5eW5jamVzaWJ0cmlsaXBzZmhtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMTcwMTQsImV4cCI6MjA5Njg5MzAxNH0._N1814zGx3ulKejZ5yre0gaTzEjjurikV9Zjih4vDo4';
+var SURL='https://zpmjcdbqynebhyprqmrf.supabase.co';
+var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwbWpjZGJxeW5lYmh5cHJxbXJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4MDMyNTksImV4cCI6MjA4NDM3OTI1OX0.68k7Ni0EfEVzKOa-tp9_d5QQ0Xh2u1scv_TdGwnXMtE';
 
 function db(path,method,body,retry){
   return fetch(SURL+'/rest/v1/'+path,{
@@ -431,7 +410,7 @@ function loadBeforeImgsBackground(){
 
     // Check localStorage cache first
     try{
-      var cached=localStorage.getItem('dt_img_'+code+'_'+d.beforeImgKey);
+      var cached=localStorage.getItem('dt_img_'+d.beforeImgKey);
       if(cached){
         d.beforeImg=cached;
         updateCardBefore(i,cached);
@@ -446,8 +425,8 @@ function loadBeforeImgsBackground(){
       d.beforeImg=dataUrl;
       media[fname]=b64;
       updateCardBefore(i,dataUrl);
-      // Cache in localStorage for next time (scoped to project code to avoid cross-project collision)
-      try{ localStorage.setItem('dt_img_'+code+'_'+d.beforeImgKey, dataUrl); }catch(e){}
+      // Cache in localStorage for next time
+      try{ localStorage.setItem('dt_img_'+d.beforeImgKey, dataUrl); }catch(e){}
       loadNext();
     }).catch(function(){ loadNext(); });
   }
@@ -489,15 +468,11 @@ function loadAfterPhotosBatch(code, total, offset){
 function loadBeforeImgsBatch(code,relsMap,start){
   var BATCH=50;
   if(start===0){
-    // Only load before images for the CURRENT page for speed
-    var pageStart=currentPage*PAGE_SIZE;
-    var pageEnd=Math.min(pageStart+PAGE_SIZE,defects.length);
     window._imgQ=[];
-    for(var i=pageStart;i<pageEnd;i++){
-      var d=defects[i];
+    defects.forEach(function(d,i){
       if(d.beforeImgKey&&relsMap[d.beforeImgKey])
         window._imgQ.push({d:d,i:i,fname:relsMap[d.beforeImgKey]});
-    }
+    });
     window._imgQ.sort(function(a,b){return (a.d.afterImg?1:0)-(b.d.afterImg?1:0);});
     var ind=document.getElementById('photoLoadInd');
     if(ind&&window._imgQ.length>0){ind.style.display='inline';ind.textContent='📷 0/'+window._imgQ.length;}
@@ -511,7 +486,7 @@ function loadBeforeImgsBatch(code,relsMap,start){
   Promise.all(q.slice(start,start+BATCH).map(function(item){
     var d=item.d,i=item.i,fname=item.fname;
     try{
-      var c=localStorage.getItem('dt_img_'+code+'_'+d.beforeImgKey);
+      var c=localStorage.getItem('dt_img_'+d.beforeImgKey);
       if(c){d.beforeImg=c;var card=document.getElementById('card-'+i);if(card){var s=card.querySelector('.pslot:first-child');if(s)s.innerHTML='<img src="'+c+'" alt="Before"><div class="plbl lb">Before</div>';}return Promise.resolve();}
     }catch(e){}
     return stoGet(code+'/media/'+fname).then(function(b64){
@@ -520,7 +495,7 @@ function loadBeforeImgsBatch(code,relsMap,start){
       d.beforeImg=url;media[fname]=b64;
       var card=document.getElementById('card-'+i);
       if(card){var s=card.querySelector('.pslot:first-child');if(s)s.innerHTML='<img src="'+url+'" alt="Before"><div class="plbl lb">Before</div>';}
-      try{localStorage.setItem('dt_img_'+code+'_'+d.beforeImgKey,url);}catch(e){}
+      try{localStorage.setItem('dt_img_'+d.beforeImgKey,url);}catch(e){}
     }).catch(function(){});
   })).then(function(){
     var ind=document.getElementById('photoLoadInd');
@@ -581,18 +556,18 @@ function stoGet(path){
   });
 }
 
-// Compress a base64 image to max 1200px, 85% jpeg
+// Compress a base64 image to max 800px, 70% jpeg
 function compressImg(b64,mime){
   return new Promise(function(resolve){
     var img=new Image();
     img.onload=function(){
-      var W=1200,H=1200,w=img.width,h=img.height;
+      var W=800,H=800,w=img.width,h=img.height;
       if(w>W){h=Math.round(h*W/w);w=W;}
       if(h>H){w=Math.round(w*H/h);h=H;}
       var c=document.createElement('canvas');
       c.width=w;c.height=h;
       c.getContext('2d').drawImage(img,0,0,w,h);
-      resolve(c.toDataURL('image/jpeg',0.85).split(',')[1]);
+      resolve(c.toDataURL('image/jpeg',0.7).split(',')[1]);
     };
     img.onerror=function(){resolve(b64);};
     img.src='data:'+(mime||'image/jpeg')+';base64,'+b64;
@@ -616,23 +591,7 @@ try{
   S.savedRels  = JSON.parse(localStorage.getItem('dt_rels')||'{}');
 }catch(e){}
 
-var defects=[],docB64=null,rels={},media={},xmlFiles={},selectedFile=null,currentProject=null,currentPage=0;
-
-// ── CLEAR STALE IMAGE CACHE (one-time fix for old cross-project keys) ──────────
-// Old cache keys were 'dt_img_rId8' (no project code) — these collide across projects.
-// New keys are 'dt_img_PROJECTCODE_rId8'. Wipe any old-format keys on load.
-(function(){
-  try{
-    var toDelete=[];
-    for(var i=0;i<localStorage.length;i++){
-      var k=localStorage.key(i);
-      // Old format: dt_img_rId... (no underscore-separated project code in middle)
-      if(k&&k.startsWith('dt_img_r')){ toDelete.push(k); }
-    }
-    toDelete.forEach(function(k){ localStorage.removeItem(k); });
-    if(toDelete.length) console.log('Cleared '+toDelete.length+' stale cross-project image cache entries.');
-  }catch(e){}
-})();
+var defects=[],docB64=null,rels={},media={},xmlFiles={},selectedFile=null,currentProject=null;
 
 // ── INIT ──────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',function(){
@@ -877,13 +836,31 @@ function parseDefects(xml){
     for(var ri=0;ri<rows.length&&!found;ri++){
       var cells=rows[ri].match(/<w:tc>[\s\S]*?<\/w:tc>/g)||[];
       for(var ci=0;ci<cells.length-1&&!found;ci++){
-        var cell=cells[ci],nextCell=cells[ci+1];
-        var bRidM=cell.match(/r:embed="([^"]+)"/);
-        if(!bRidM) continue;
-        // Check if right cell already has an after photo (partially completed Word file)
-        var aRidM=nextCell.match(/r:embed="([^"]+)"/);
-        var cxM=cell.match(/cx="(\d+)"/),cyM=cell.match(/cy="(\d+)"/);
-        var tcPrM=nextCell.match(/<w:tcPr>[\s\S]*?<\/w:tcPr>/);
+        var cellL=cells[ci],cellR=cells[ci+1];
+        var ridL=cellL.match(/r:embed="([^"]+)"/);
+        var ridR=cellR.match(/r:embed="([^"]+)"/);
+        // Skip pairs where NEITHER cell has a photo
+        if(!ridL&&!ridR) continue;
+
+        // Flexible detection: whichever cell has a photo = "before" reference.
+        // If BOTH have photos, left=before, right=after(done).
+        // If only LEFT has photo, right=after slot(pending).
+        // If only RIGHT has photo, treat that as before reference, left becomes the empty slot —
+        //   but since our report-writer always injects into the cell AFTER the before cell,
+        //   we keep left=before/right=after convention for writing, just relax detection here.
+        var beforeRid, afterRid, beforeCell, afterCell;
+        if(ridL){
+          beforeRid=ridL[1]; beforeCell=cellL;
+          afterRid=ridR?ridR[1]:null; afterCell=cellR;
+        } else {
+          // Only right cell has a photo — use it as the reference image,
+          // left cell becomes the slot we'd write into (rare/unusual layout)
+          beforeRid=ridR[1]; beforeCell=cellR;
+          afterRid=null; afterCell=cellL;
+        }
+
+        var cxM=beforeCell.match(/cx="(\d+)"/),cyM=beforeCell.match(/cy="(\d+)"/);
+        var tcPrM=afterCell.match(/<w:tcPr>[\s\S]*?<\/w:tcPr>/);
         var txts='',txRe=/<w:t[^>]*>([^<]*)<\/w:t>/g,tx;
         while((tx=txRe.exec(tbl))!==null) txts+=tx[1]+' ';
         txts=txts.replace(/\s+/g,' ').trim();
@@ -891,9 +868,9 @@ function parseDefects(xml){
         defects.push({
           tblIdx:tblIdx,num:num,desc:eDesc(txts),location:eLoc(txts),
           beforeImg:null,
-          afterImg:null,          // restored from media after upload
-          existingAfterRid:aRidM?aRidM[1]:null,  // rId of existing after photo in docx
-          rId:bRidM[1],
+          afterImg:null,
+          existingAfterRid:afterRid,
+          rId:beforeRid,
           origCx:cxM?parseInt(cxM[1]):1440000,origCy:cyM?parseInt(cyM[1]):1728000,
           afterTcPr:tcPrM?tcPrM[0]:'',injectRow:ri,injectCell:ci+1
         });
@@ -921,7 +898,6 @@ function eLoc(t){
 
 // ── RENDER ────────────────────────────────────────────
 function renderProject(){
-  currentPage=0;
   document.getElementById('projName').textContent=currentProject.name;
   document.getElementById('projCode').textContent=currentProject.id;
   renderCards();updateStats();
@@ -941,58 +917,9 @@ function renderProject(){
     localStorage.setItem('dt_rels', JSON.stringify(rels));
   }catch(e){}
 }
-var PAGE_SIZE=50;
 function renderCards(){
-  var g=document.getElementById('grid');
-  g.innerHTML='';
-  var total=defects.length;
-  var totalPages=Math.ceil(total/PAGE_SIZE);
-  if(currentPage<0) currentPage=0;
-  if(currentPage>=totalPages) currentPage=Math.max(0,totalPages-1);
-  var start=currentPage*PAGE_SIZE;
-  var end=Math.min(start+PAGE_SIZE,total);
-  for(var i=start;i<end;i++) g.appendChild(mkCard(defects[i],i));
-  // Pagination bar
-  var pgbar=document.getElementById('pgbar');
-  if(totalPages>1){
-    pgbar.style.display='flex';
-    document.getElementById('pgbarTop').style.display='flex';
-    document.getElementById('pgFrom').textContent=start+1;
-    document.getElementById('pgTo').textContent=end;
-    document.getElementById('pgTotal').textContent=total;
-    document.getElementById('pgPrev').disabled=(currentPage===0);
-    document.getElementById('pgNext').disabled=(currentPage>=totalPages-1);
-    document.getElementById('pgPrevTop').disabled=(currentPage===0);
-    document.getElementById('pgNextTop').disabled=(currentPage>=totalPages-1);
-    document.getElementById('pgFromTop').textContent=start+1;
-    document.getElementById('pgToTop').textContent=end;
-    document.getElementById('pgTotalTop').textContent=total;
-    // Build page buttons for both bars
-    ['pgNums','pgNumsTop'].forEach(function(id){
-      var nums=document.getElementById(id);
-      nums.innerHTML='';
-      for(var p=0;p<totalPages;p++){
-        (function(pg){
-          var btn=document.createElement('button');
-          btn.className='pgnum'+(pg===currentPage?' act':'');
-          btn.textContent=pg+1;
-          btn.onclick=function(){changePage(pg);};
-          nums.appendChild(btn);
-        })(p);
-      }
-    });
-  } else {
-    pgbar.style.display='none';
-    document.getElementById('pgbarTop').style.display='none';
-  }
-}
-function changePage(p){
-  var totalPages=Math.ceil(defects.length/PAGE_SIZE);
-  if(p<0||p>=totalPages) return;
-  currentPage=p;
-  renderCards();
-  window.scrollTo(0,0);
-  if(currentProject&&rels) loadBeforeImgsBatch(currentProject.id,rels,0);
+  var g=document.getElementById('grid');g.innerHTML='';
+  defects.forEach(function(d,i){g.appendChild(mkCard(d,i));});
 }
 function mkCard(d,i){
   var el=document.createElement('div');
@@ -1032,49 +959,37 @@ function handlePhoto(e,i){
   if(badge){badge.className='badge b-sync';badge.textContent='⏳ Saving…';}
   var r=new FileReader();
   r.onload=function(ev){
-    // Compress to max 1024px / 70% JPEG before saving
-    var img=new Image();
-    img.onload=function(){
-      var MAX=1024,w=img.width,h=img.height;
-      if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}
-      if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}
-      var c=document.createElement('canvas');
-      c.width=w;c.height=h;
-      c.getContext('2d').drawImage(img,0,0,w,h);
-      var url=c.toDataURL('image/jpeg',0.7);
-      var b64=url.split(',')[1];
-      defects[i].afterImg=url;
-      // Update localStorage
-      try{
-        var toSave=defects.map(function(d){
-          return{tblIdx:d.tblIdx,num:d.num,desc:d.desc,location:d.location,
-                 origCx:d.origCx,origCy:d.origCy,afterTcPr:d.afterTcPr,
-                 injectRow:d.injectRow,injectCell:d.injectCell,
-                 beforeImgKey:d.rId,existingAfterRid:d.existingAfterRid||null,
-                 afterImg:d.afterImg||null};
-        });
-        localStorage.setItem('dt_defects',JSON.stringify(toSave));
-      }catch(e){}
-      var aslot=document.getElementById('aslot-'+i);
-      if(aslot) aslot.innerHTML='<img src="'+url+'" alt="After"><div class="plbl la">After</div>';
-      var card=document.getElementById('card-'+i);
-      if(card) card.className='card dn';
-      var btnsDiv=document.getElementById('btns-'+i);
-      if(btnsDiv) btnsDiv.innerHTML='<div class="cbtns"><label for="cam-'+i+'" class="btn b-gst b-sm">📷 Retake</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div><button class="btn b-red b-sm" style="width:100%;margin-top:6px;" onclick="deletePhoto('+i+')">🗑 Remove After Photo</button>';
-      updateStats();
-      // Save to Supabase
-      db('dt_after_photos?project_id=eq.'+encodeURIComponent(currentProject.id)+'&tbl_idx=eq.'+defects[i].tblIdx,'DELETE').then(function(){
-        return db('dt_after_photos','POST',{project_id:currentProject.id,tbl_idx:defects[i].tblIdx,photo_b64:b64});
-      }).then(function(){
-        if(badge){badge.className='badge b-done';badge.textContent='✓ Done';}
-        toast('Saved to cloud ✓','g');
-      }).catch(function(err){
-        console.error(err);
-        if(badge){badge.className='badge b-done';badge.textContent='✓ Local';}
-        toast('Photo saved locally (check internet)','y');
+    var url=ev.target.result,b64=url.split(',')[1];
+    defects[i].afterImg=url;
+    // Update localStorage so reload restores after photos too
+    try{
+      var toSave=defects.map(function(d){
+        return{tblIdx:d.tblIdx,num:d.num,desc:d.desc,location:d.location,
+               origCx:d.origCx,origCy:d.origCy,afterTcPr:d.afterTcPr,
+               injectRow:d.injectRow,injectCell:d.injectCell,
+               beforeImgKey:d.rId,existingAfterRid:d.existingAfterRid||null,
+               afterImg:d.afterImg||null};
       });
-    };
-    img.src=ev.target.result;
+      localStorage.setItem('dt_defects',JSON.stringify(toSave));
+    }catch(e){}
+    var aslot=document.getElementById('aslot-'+i);
+    if(aslot) aslot.innerHTML='<img src="'+url+'" alt="After"><div class="plbl la">After</div>';
+    var card=document.getElementById('card-'+i);
+    if(card) card.className='card dn';
+    var btnsDiv=document.getElementById('btns-'+i);
+    if(btnsDiv) btnsDiv.innerHTML='<div class="cbtns"><label for="cam-'+i+'" class="btn b-gst b-sm">📷 Retake</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div><button class="btn b-red b-sm" style="width:100%;margin-top:6px;" onclick="deletePhoto('+i+')">🗑 Remove After Photo</button>';
+    updateStats();
+    // Save to Supabase — delete old then insert new
+    db('dt_after_photos?project_id=eq.'+encodeURIComponent(currentProject.id)+'&tbl_idx=eq.'+defects[i].tblIdx,'DELETE').then(function(){
+      return db('dt_after_photos','POST',{project_id:currentProject.id,tbl_idx:defects[i].tblIdx,photo_b64:b64});
+    }).then(function(){
+      if(badge){badge.className='badge b-done';badge.textContent='✓ Done';}
+      toast('Saved to cloud ✓','g');
+    }).catch(function(err){
+      console.error(err);
+      if(badge){badge.className='badge b-done';badge.textContent='✓ Local';}
+      toast('Photo saved locally (check internet)','y');
+    });
   };
   r.readAsDataURL(f);
   e.target.value='';
@@ -1093,7 +1008,7 @@ function refreshPhotos(){
       });
     }
     if(updated>0){renderCards();updateStats();toast(updated+' new photo(s) loaded ✓','g');}
-    else toast('Up to date ✓','');
+    else toast('Up to date','');
   }).catch(function(){toast('Refresh failed','r');});
 }
 
