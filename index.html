@@ -119,6 +119,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
 .pgn-btn:hover{border-color:var(--grn);color:var(--grn);}
 .pgn-btn:disabled{opacity:.4;cursor:not-allowed;}
 .pgn-info{font-size:13px;color:var(--mut);font-family:'DM Mono',monospace;}
+.pgn-sel{background:var(--sur2);border:1px solid var(--bor);color:var(--txt);border-radius:8px;padding:7px 10px;font-size:13px;font-family:'DM Mono',monospace;cursor:pointer;}
+.pgn-sel:focus{outline:none;border-color:var(--grn);}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--sur2);border:1px solid var(--bor);border-radius:8px;padding:10px 18px;font-size:13px;z-index:300;animation:fup .2s ease;white-space:nowrap;max-width:92vw;text-align:center;}
 .tg{border-color:var(--grn);color:var(--grn);}.tr{border-color:var(--red);color:var(--red);}.ty{border-color:var(--yel);color:var(--yel);}
 @keyframes fup{from{opacity:0;transform:translateX(-50%) translateY(8px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
@@ -222,6 +224,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
       <button class="btn b-grn b-sm" onclick="showGen()">📥 Report</button>
     </div>
   </div>
+  <div class="pgn" id="pgn-top"></div>
   <div class="grid" id="grid"></div>
   <div class="pgn" id="pgn"></div>
 </div>
@@ -934,17 +937,24 @@ function renderCards(){
   var start=(currentPage-1)*PAGE_SIZE;
   var end=Math.min(start+PAGE_SIZE,total);
   for(var i=start;i<end;i++) g.appendChild(mkCard(defects[i],i));
-  // Render pagination
-  var pgn=document.getElementById('pgn');
-  if(pgn){
-    if(totalPages<=1){ pgn.innerHTML=''; }
-    else {
-      pgn.innerHTML=
-        '<button class="pgn-btn" onclick="goPage('+(currentPage-1)+')" '+(currentPage<=1?'disabled':'')+'>← Prev</button>'+
-        '<span class="pgn-info">Page '+currentPage+' / '+totalPages+'&nbsp;&nbsp;('+total+' defects)</span>'+
-        '<button class="pgn-btn" onclick="goPage('+(currentPage+1)+')" '+(currentPage>=totalPages?'disabled':'')+'>Next →</button>';
-    }
+  // Render both top and bottom pagination
+  var pgnTop=document.getElementById('pgn-top');
+  var pgnBot=document.getElementById('pgn');
+  var html=buildPagination(totalPages,total);
+  if(pgnTop) pgnTop.innerHTML=totalPages<=1?'':html;
+  if(pgnBot) pgnBot.innerHTML=totalPages<=1?'':html;
+}
+
+function buildPagination(totalPages,total){
+  // Build page number selector options
+  var opts='';
+  for(var p=1;p<=totalPages;p++){
+    opts+='<option value="'+p+'"'+(p===currentPage?' selected':'')+'>Page '+p+'</option>';
   }
+  return '<button class="pgn-btn" onclick="goPage('+(currentPage-1)+')" '+(currentPage<=1?'disabled':'')+'>← Prev</button>'+
+    '<select class="pgn-sel" onchange="goPage(parseInt(this.value))">'+opts+'</select>'+
+    '<span class="pgn-info">of '+totalPages+' &nbsp;('+total+' defects)</span>'+
+    '<button class="pgn-btn" onclick="goPage('+(currentPage+1)+')" '+(currentPage>=totalPages?'disabled':'')+'>Next →</button>';
 }
 
 function goPage(p){
