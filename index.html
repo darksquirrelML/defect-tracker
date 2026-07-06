@@ -114,6 +114,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
 .mod-f{display:flex;gap:10px;justify-content:flex-end;}
 /* Toast */
 .login-err{color:var(--red);font-size:12px;margin-bottom:8px;}
+.pgn{display:flex;align-items:center;justify-content:center;gap:10px;padding:14px;flex-wrap:wrap;}
+.pgn-btn{background:var(--sur2);border:1px solid var(--bor);color:var(--txt);border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.pgn-btn:hover{border-color:var(--grn);color:var(--grn);}
+.pgn-btn:disabled{opacity:.4;cursor:not-allowed;}
+.pgn-info{font-size:13px;color:var(--mut);font-family:'DM Mono',monospace;}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--sur2);border:1px solid var(--bor);border-radius:8px;padding:10px 18px;font-size:13px;z-index:300;animation:fup .2s ease;white-space:nowrap;max-width:92vw;text-align:center;}
 .tg{border-color:var(--grn);color:var(--grn);}.tr{border-color:var(--red);color:var(--red);}.ty{border-color:var(--yel);color:var(--yel);}
 @keyframes fup{from{opacity:0;transform:translateX(-50%) translateY(8px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
@@ -218,6 +223,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
     </div>
   </div>
   <div class="grid" id="grid"></div>
+  <div class="pgn" id="pgn"></div>
 </div>
 
 <!-- GENERATE -->
@@ -592,6 +598,7 @@ try{
 }catch(e){}
 
 var defects=[],docB64=null,rels={},media={},xmlFiles={},selectedFile=null,currentProject=null;
+var currentPage=1, PAGE_SIZE=50;
 
 // ── INIT ──────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',function(){
@@ -819,7 +826,9 @@ function joinProject(isAuto){
       setLoad('Ready!','',100);
       setTimeout(function(){
         renderProject(); showScr('scrList');
-        loadBeforeImgsBatch(code,rels,0);
+        // Load current page photos first, then rest in background
+        loadPagePhotos();
+        setTimeout(function(){ loadBeforeImgsBatch(code,rels,0); }, 1000);
       },300);
     });
     }).catch(function(e){console.error(e);toast('Error: '+e.message,'r');showScr('scrHome');});
@@ -898,6 +907,7 @@ function eLoc(t){
 
 // ── RENDER ────────────────────────────────────────────
 function renderProject(){
+  currentPage=1;
   document.getElementById('projName').textContent=currentProject.name;
   document.getElementById('projCode').textContent=currentProject.id;
   renderCards();updateStats();
@@ -919,7 +929,67 @@ function renderProject(){
 }
 function renderCards(){
   var g=document.getElementById('grid');g.innerHTML='';
-  defects.forEach(function(d,i){g.appendChild(mkCard(d,i));});
+  var total=defects.length;
+  var totalPages=Math.ceil(total/PAGE_SIZE);
+  if(currentPage>totalPages) currentPage=1;
+  var start=(currentPage-1)*PAGE_SIZE;
+  var end=Math.min(start+PAGE_SIZE, total);
+  for(var i=start;i<end;i++) g.appendChild(mkCard(defects[i],i));
+  renderPagination(totalPages);
+}
+
+function renderPagination(totalPages){
+  var pgn=document.getElementById('pgn');
+  if(!pgn) return;
+  if(totalPages<=1){pgn.innerHTML='';return;}
+  pgn.innerHTML=
+    '<button class="pgn-btn" onclick="goPage('+(currentPage-1)+')" '+(currentPage<=1?'disabled':'')+'>← Prev</button>'+
+    '<span class="pgn-info">Page '+currentPage+' of '+totalPages+' &nbsp;('+defects.length+' defects)</span>'+
+    '<button class="pgn-btn" onclick="goPage('+(currentPage+1)+')" '+(currentPage>=totalPages?'disabled':'')+'>Next →</button>';
+}
+
+function goPage(p){
+  var totalPages=Math.ceil(defects.length/PAGE_SIZE);
+  if(p<1||p>totalPages) return;
+  currentPage=p;
+  renderCards();
+  // Scroll to top of grid
+  var g=document.getElementById('grid');
+  if(g) g.scrollIntoView({behavior:'smooth',block:'start'});
+  // Load before photos for this page
+  loadPagePhotos();
+}
+
+function loadPagePhotos(){
+  var start=(currentPage-1)*PAGE_SIZE;
+  var end=Math.min(start+PAGE_SIZE, defects.length);
+  var code=S.savedCode||currentProject&&currentProject.id;
+  var relsMap=S.savedRels||rels;
+  if(!code||!relsMap) return;
+  for(var i=start;i<end;i++){
+    var d=defects[i];
+    if(d.beforeImg||!d.beforeImgKey||!relsMap[d.beforeImgKey]) continue;
+    (function(def,idx){
+      var fname=relsMap[def.beforeImgKey];
+      try{
+        var cached=localStorage.getItem('dt_img_'+def.beforeImgKey);
+        if(cached){
+          def.beforeImg=cached;
+          var card=document.getElementById('card-'+idx);
+          if(card){var s=card.querySelector('.pslot:first-child');if(s)s.innerHTML='<img src="'+cached+'" alt="Before"><div class="plbl lb">Before</div>';}
+          return;
+        }
+      }catch(e){}
+      stoGet(code+'/media/'+fname).then(function(b64){
+        var ext=fname.split('.').pop().toLowerCase();
+        var url='data:image/'+(ext==='jpg'||ext==='jpeg'?'jpeg':ext)+';base64,'+b64;
+        def.beforeImg=url; media[fname]=b64;
+        var card=document.getElementById('card-'+idx);
+        if(card){var s=card.querySelector('.pslot:first-child');if(s)s.innerHTML='<img src="'+url+'" alt="Before"><div class="plbl lb">Before</div>';}
+        try{localStorage.setItem('dt_img_'+def.beforeImgKey,url);}catch(e){}
+      }).catch(function(){});
+    })(d,i);
+  }
 }
 function mkCard(d,i){
   var el=document.createElement('div');
