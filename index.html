@@ -1055,7 +1055,7 @@ function handlePhoto(e,i){
       var card=document.getElementById('card-'+i);
       if(card) card.className='card dn';
       var btnsDiv=document.getElementById('btns-'+i);
-      if(btnsDiv) btnsDiv.innerHTML='<div class="cbtns"><label for="cam-'+i+'" class="btn b-gst b-sm">📷 Retake</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div><button class="btn b-red b-sm" style="width:100%;margin-top:6px;" onclick="deletePhoto('+i+')">🗑 Remove After Photo</button>';
+      if(btnsDiv) btnsDiv.innerHTML='<div class="cbtns"><label for="cam-'+i+'" class="btn b-gst b-sm">📷 Retake</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div><button class="btn b-red b-sm" style="width:100%;margin-top:6px;" onclick="deletePhoto('+i+')">🗑 Remove After Photo</button><button class="btn b-gst b-sm" style="width:100%;margin-top:6px;" onclick="addRemark('+i+')">'+(defects[i].remark?'📝 Edit Remark':'📝 Add Remark')+'</button>';
       updateStats();
       // Save to Supabase — delete old then insert new
       db('dt_after_photos?project_id=eq.'+encodeURIComponent(currentProject.id)+'&tbl_idx=eq.'+defects[i].tblIdx,'DELETE').then(function(){
