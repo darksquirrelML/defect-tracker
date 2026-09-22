@@ -1215,7 +1215,7 @@ function saveRemark(){
   }
   // Save to Supabase
   db('dt_after_photos?project_id=eq.'+encodeURIComponent(currentProject.id)+'&tbl_idx=eq.'+defects[remarkIdx].tblIdx,'DELETE').then(function(){
-    return db('dt_after_photos','POST',{project_id:currentProject.id,tbl_idx:defects[remarkIdx].tblIdx,remark:txt});
+    return db('dt_after_photos','POST',{project_id:currentProject.id,tbl_idx:defects[remarkIdx].tblIdx,photo_b64:null,remark:txt});
   }).then(function(){ toast('Remark saved ✓','g'); })
   .catch(function(e){ toast('Save failed: '+e.message,'r'); });
 }
