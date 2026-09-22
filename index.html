@@ -266,6 +266,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
   </div>
 </div>
 
+<!-- Remark Modal -->
+<div class="ov hi" id="remarkOv">
+  <div class="mod">
+    <h3>📝 Add Remark</h3>
+    <p style="color:var(--mut);font-size:13px;margin-bottom:10px;">Enter remark for this defect (e.g. "Not in contract", "Excluded").</p>
+    <textarea id="remarkTxt" style="width:100%;height:100px;background:var(--sur2);border:1px solid var(--bor);border-radius:8px;padding:10px;color:var(--txt);font-size:13px;font-family:'DM Sans',sans-serif;resize:vertical;" placeholder="Type remark here..."></textarea>
+    <div class="mod-f" style="margin-top:12px;">
+      <button class="btn b-gst" onclick="hideMod('remarkOv')">Cancel</button>
+      <button class="btn b-red b-sm" onclick="deleteRemark()" id="delRemarkBtn">🗑 Remove</button>
+      <button class="btn b-grn" onclick="saveRemark()">Save Remark</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 // ── SUPABASE ──────────────────────────────────────────
@@ -459,7 +473,10 @@ function loadAfterPhotosBatch(code, total, offset){
       if(photos&&photos.length){
         photos.forEach(function(p){
           var d=defects.find(function(x){return x.tblIdx===p.tbl_idx;});
-          if(d) d.afterImg='data:image/jpeg;base64,'+p.photo_b64;
+          if(d){
+            if(p.photo_b64) d.afterImg='data:image/jpeg;base64,'+p.photo_b64;
+            if(p.remark) d.remark=p.remark;
+          }
         });
         setLoad('Loading after photos…',photos.length+' loaded',75);
         if(photos.length===LIMIT){
@@ -966,18 +983,23 @@ function goPage(p){
 }
 function mkCard(d,i){
   var el=document.createElement('div');
-  el.className='card'+(d.afterImg?' dn':'');el.id='card-'+i;
+  el.className='card'+((d.afterImg||d.remark)?' dn':'');el.id='card-'+i;
   var bH=d.beforeImg?'<img src="'+d.beforeImg+'" alt="Before">':'<div class="pempty"><div class="pei">📷</div><div>No photo</div></div>';
-  var aH=d.afterImg?'<img src="'+d.afterImg+'" alt="After">':'<div class="pempty"><div class="pei">📸</div><div>Tap to add</div></div>';
+  var aH=d.afterImg
+    ?'<img src="'+d.afterImg+'" alt="After">'
+    :d.remark
+      ?'<div class="pempty" style="padding:8px;text-align:center;font-size:11px;color:var(--yel);word-break:break-word;">📝 '+d.remark+'</div>'
+      :'<div class="pempty"><div class="pei">📸</div><div>Tap to add</div></div>';
+  var remarkBtn='<button class="btn b-gst b-sm" style="width:100%;margin-top:6px;" onclick="addRemark('+i+')">📝 '+(d.remark?'Edit Remark':'Add Remark')+'</button>';
   var btns=d.afterImg
     ?'<div class="cbtns"><label for="cam-'+i+'" class="btn b-gst b-sm">📷 Retake</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div>'+
       '<button class="btn b-red b-sm" style="width:100%;margin-top:6px;" onclick="deletePhoto('+i+')">🗑 Remove After Photo</button>'
-    :'<div class="cbtns"><label for="cam-'+i+'" class="btn b-blu b-sm">📷 Camera</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div>';
+    :'<div class="cbtns"><label for="cam-'+i+'" class="btn b-blu b-sm">📷 Camera</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div>'+remarkBtn;
   el.innerHTML=
     '<div class="ch">'+
       '<div class="dn-num">#'+d.num+'</div>'+
       '<div class="dn-desc">'+(d.desc||'No description')+'</div>'+
-      '<div class="badge '+(d.afterImg?'b-done':'b-pend')+'" id="badge-'+i+'">'+(d.afterImg?'✓ Done':'Pending')+'</div>'+
+      '<div class="badge '+((d.afterImg||d.remark)?'b-done':'b-pend')+'" id="badge-'+i+'">'+(d.afterImg?'✓ Done':d.remark?'📝 Remark':'Pending')+'</div>'+
     '</div>'+
     '<div class="cb">'+
       (d.location?'<div class="cmeta">📍 <span>'+d.location+'</span></div>':'')+
@@ -1054,7 +1076,7 @@ function handlePhoto(e,i){
 function refreshPhotos(){
   if(!currentProject) return;
   toast('Refreshing…','');
-  db('dt_after_photos?project_id=eq.'+encodeURIComponent(currentProject.id)+'&select=tbl_idx,photo_b64').then(function(photos){
+  db('dt_after_photos?project_id=eq.'+encodeURIComponent(currentProject.id)+'&select=tbl_idx,photo_b64,remark').then(function(photos){
     var updated=0;
     if(photos&&photos.length){
       photos.forEach(function(p){
@@ -1069,7 +1091,7 @@ function refreshPhotos(){
 
 // ── STATS ──────────────────────────────────────────────
 function updateStats(){
-  var t=defects.length,d=defects.filter(function(x){return x.afterImg;}).length;
+  var t=defects.length,d=defects.filter(function(x){return x.afterImg||x.remark;}).length;
   document.getElementById('sT').textContent=t;
   document.getElementById('sD').textContent=d;
   document.getElementById('sP').textContent=t-d;
@@ -1107,8 +1129,14 @@ function generateReport(){
         var cells=rows[rIdx].match(/<w:tc>[\s\S]*?<\/w:tc>/g)||[];
         var cIdx=def.injectCell||1;
         if(cells&&cells.length>cIdx){
-          var nc='<w:tc>'+(def.afterTcPr||'')+'<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r>'+mkImg(rId,cx,cy)+'</w:r></w:p></w:tc>';
-          tbl=tbl.replace(rows[rIdx],rows[rIdx].replace(cells[cIdx],nc));
+          var nc;
+          if(def.afterImg){
+            nc='<w:tc>'+(def.afterTcPr||'')+'<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r>'+mkImg(rId,cx,cy)+'</w:r></w:p></w:tc>';
+          } else if(def.remark){
+            // No photo — insert remark text into after cell
+            nc='<w:tc>'+(def.afterTcPr||'')+'<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="FF6600"/></w:rPr><w:t>'+def.remark.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</w:t></w:r></w:p></w:tc>';
+          }
+          if(nc) tbl=tbl.replace(rows[rIdx],rows[rIdx].replace(cells[cIdx],nc));
         }
       }
       result+=tbl;lastIdx=tM.index+tM[0].length;
@@ -1159,6 +1187,50 @@ function deleteProject(){
       toast('Project fully deleted from cloud ✓','g');
     },400);
   }).catch(function(e){toast('Error: '+e.message,'r');showScr('scrList');});
+}
+
+// ── REMARK ────────────────────────────────────────────
+var remarkIdx=null;
+function addRemark(i){
+  remarkIdx=i;
+  document.getElementById('remarkTxt').value=defects[i].remark||'';
+  var delBtn=document.getElementById('delRemarkBtn');
+  if(delBtn) delBtn.style.display=defects[i].remark?'inline-flex':'none';
+  showMod('remarkOv');
+}
+function saveRemark(){
+  if(remarkIdx===null) return;
+  var txt=document.getElementById('remarkTxt').value.trim();
+  if(!txt){ hideMod('remarkOv'); return; }
+  defects[remarkIdx].remark=txt;
+  hideMod('remarkOv');
+  // Update card
+  var i=remarkIdx;
+  var card=document.getElementById('card-'+i);
+  if(card){
+    var aslot=document.getElementById('aslot-'+i);
+    if(aslot) aslot.innerHTML='<div class="pempty" style="padding:8px;text-align:center;font-size:11px;color:var(--yel);word-break:break-word;">📝 '+txt+'</div><div class="plbl la">After</div>';
+    var btnsDiv=document.getElementById('btns-'+i);
+    if(btnsDiv) btnsDiv.innerHTML='<div class="cbtns"><label for="cam-'+i+'" class="btn b-blu b-sm">📷 Camera</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div><button class="btn b-gst b-sm" style="width:100%;margin-top:6px;" onclick="addRemark('+i+')">📝 Edit Remark</button>';
+  }
+  // Save to Supabase
+  db('dt_after_photos?project_id=eq.'+encodeURIComponent(currentProject.id)+'&tbl_idx=eq.'+defects[remarkIdx].tblIdx,'DELETE').then(function(){
+    return db('dt_after_photos','POST',{project_id:currentProject.id,tbl_idx:defects[remarkIdx].tblIdx,remark:txt});
+  }).then(function(){ toast('Remark saved ✓','g'); })
+  .catch(function(e){ toast('Save failed: '+e.message,'r'); });
+}
+function deleteRemark(){
+  if(remarkIdx===null) return;
+  defects[remarkIdx].remark=null;
+  hideMod('remarkOv');
+  var i=remarkIdx;
+  var aslot=document.getElementById('aslot-'+i);
+  if(aslot) aslot.innerHTML='<div class="pempty"><div class="pei">📸</div><div>Tap to add</div></div><div class="plbl la">After</div>';
+  var btnsDiv=document.getElementById('btns-'+i);
+  if(btnsDiv) btnsDiv.innerHTML='<div class="cbtns"><label for="cam-'+i+'" class="btn b-blu b-sm">📷 Camera</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div><button class="btn b-gst b-sm" style="width:100%;margin-top:6px;" onclick="addRemark('+i+')">📝 Add Remark</button>';
+  db('dt_after_photos?project_id=eq.'+encodeURIComponent(currentProject.id)+'&tbl_idx=eq.'+defects[remarkIdx].tblIdx,'DELETE')
+    .then(function(){ toast('Remark removed ✓','g'); })
+    .catch(function(e){ toast('Remove failed: '+e.message,'r'); });
 }
 
 // ── DELETE PHOTO ──────────────────────────────────────
