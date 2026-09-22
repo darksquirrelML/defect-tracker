@@ -1,5 +1,5 @@
-// Defect Tracker Service Worker v2.2
-var CACHE = 'defect-tracker-v3';
+// Defect Tracker Service Worker v2.3
+var CACHE = 'defect-tracker-v4';
 var ASSETS = [
   '/defect-tracker/',
   '/defect-tracker/index.html',
@@ -29,11 +29,11 @@ self.addEventListener('fetch', function(e){
     e.respondWith(fetch(e.request).catch(function(){return caches.match(e.request);}));
   } else {
     // Always fetch fresh for HTML files
-    if(e.request.url.endsWith('.html') || e.request.url.endsWith('/')){
+    if(e.request.url.endsWith('.html')||e.request.url.endsWith('/')){
       e.respondWith(fetch(e.request).catch(function(){return caches.match(e.request);}));
     } else {
       e.respondWith(
-        caches.match(e.request).then(function(r){ return r || fetch(e.request); })
+        caches.match(e.request).then(function(r){ return r||fetch(e.request); })
       );
     }
   }
