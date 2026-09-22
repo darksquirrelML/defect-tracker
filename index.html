@@ -1141,7 +1141,7 @@ function generateReport(){
             var rmk=def.remark.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
             nc='<w:tc>'+(def.afterTcPr||'')+
               '<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r>'+mkImg(rId,cx,cy)+'</w:r></w:p>'+
-              '<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="FF6600"/><w:sz w:val="18"/></w:rPr><w:t>'+rmk+'</w:t></w:r></w:p>'+
+              '<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/><w:sz w:val="18"/></w:rPr><w:t>'+rmk+'</w:t></w:r></w:p>'+
               '</w:tc>';
           } else if(def.afterImg){
             // Photo only
@@ -1149,7 +1149,7 @@ function generateReport(){
           } else if(def.remark){
             // Remark only — no photo
             var rmk=def.remark.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-            nc='<w:tc>'+(def.afterTcPr||'')+'<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="FF6600"/></w:rPr><w:t>'+rmk+'</w:t></w:r></w:p></w:tc>';
+            nc='<w:tc>'+(def.afterTcPr||'')+'<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>'+rmk+'</w:t></w:r></w:p></w:tc>';
           }
           if(nc) tbl=tbl.replace(rows[rIdx],rows[rIdx].replace(cells[cIdx],nc));
         }
