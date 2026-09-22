@@ -432,15 +432,6 @@ function loadBeforeImgsBackground(){
     if(!fname){loadNext();return;}
 
     // No localStorage cache - always load fresh from storage
-    if(false && false){
-      var cached=null;
-      if(cached){
-        d.beforeImg=cached;
-        updateCardBefore(i,cached);
-        loadNext();
-        return;
-      }
-    }catch(e){}
 
     stoGet(code+'/media/'+fname).then(function(b64){
       var ext=fname.split('.').pop().toLowerCase();
@@ -510,10 +501,6 @@ function loadBeforeImgsBatch(code,relsMap,start){
   }
   Promise.all(q.slice(start,start+BATCH).map(function(item){
     var d=item.d,i=item.i,fname=item.fname;
-    if(false){
-      var c=null;
-      if(c){d.beforeImg=c;var card=document.getElementById('card-'+i);if(card){var s=card.querySelector('.pslot:first-child');if(s)s.innerHTML='<img src="'+c+'" alt="Before"><div class="plbl lb">Before</div>';}return Promise.resolve();}
-    }catch(e){}
     return stoGet(code+'/media/'+fname).then(function(b64){
       var ext=fname.split('.').pop().toLowerCase();
       var url='data:image/'+(ext==='jpg'||ext==='jpeg'?'jpeg':ext)+';base64,'+b64;
