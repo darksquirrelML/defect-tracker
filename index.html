@@ -1120,7 +1120,12 @@ function generateReport(){
     return zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6},mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
   }).then(function(blob){
     var done=defects.filter(function(d){return d.afterImg;}).length;
-    dlBlob(blob,currentProject.name+'_'+done+'of'+defects.length+'.docx');
+    var today=new Date();
+    var dd=String(today.getDate()).padStart(2,'0');
+    var mm=String(today.getMonth()+1).padStart(2,'0');
+    var yy=String(today.getFullYear()).slice(-2);
+    var dateStr=dd+'-'+mm+'-'+yy;
+    dlBlob(blob,currentProject.name+'_'+done+'of'+defects.length+'_'+dateStr+'.docx');
     toast('Report downloaded ✓','g');btn.disabled=false;btn.textContent='📥 Download Report';
   }).catch(function(e){toast('Error: '+e.message,'r');btn.disabled=false;btn.textContent='📥 Download Report';});
 }
