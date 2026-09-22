@@ -1245,7 +1245,7 @@ function deletePhoto(i){
   var card=document.getElementById('card-'+i);
   if(card) card.className='card';
   var btnsDiv=document.getElementById('btns-'+i);
-  if(btnsDiv) btnsDiv.innerHTML='<div class="cbtns"><label for="cam-'+i+'" class="btn b-blu b-sm">📷 Camera</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div>';
+  if(btnsDiv) btnsDiv.innerHTML='<div class="cbtns"><label for="cam-'+i+'" class="btn b-blu b-sm">📷 Camera</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div><button class="btn b-gst b-sm" style="width:100%;margin-top:6px;" onclick="addRemark('+i+')">📝 Add Remark</button>';
   if(badge){badge.className='badge b-pend';badge.textContent='Pending';}
   updateStats();
   // Delete from Supabase
