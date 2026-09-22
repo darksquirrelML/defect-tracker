@@ -1121,12 +1121,15 @@ function generateReport(){
       tblIdx++;result+=docXml.substring(lastIdx,tM.index);
       var tbl=tM[0],def=afterMap[tblIdx];
       if(def){
-        var b64=def.afterImg.split(',')[1],isJ=def.afterImg.indexOf('image/jpeg')>=0||def.afterImg.indexOf('image/jpg')>=0;
-        var ext=isJ?'jpeg':'png',fn='after_t'+tblIdx+'.'+ext;
-        zip.file('word/media/'+fn,b64,{base64:true});
-        var rId='rId'+nextId++;
-        rXml=rXml.replace('</Relationships>','<Relationship Id="'+rId+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/'+fn+'"/></Relationships>');
-        var cx=def.origCx||1440000,cy=def.origCy||1728000;
+        var rId=null,cx=def.origCx||1440000,cy=def.origCy||1728000;
+        if(def.afterImg){
+          // Has photo — add image to zip
+          var b64=def.afterImg.split(',')[1],isJ=def.afterImg.indexOf('image/jpeg')>=0||def.afterImg.indexOf('image/jpg')>=0;
+          var ext=isJ?'jpeg':'png',fn='after_t'+tblIdx+'.'+ext;
+          zip.file('word/media/'+fn,b64,{base64:true});
+          rId='rId'+nextId++;
+          rXml=rXml.replace('</Relationships>','<Relationship Id="'+rId+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/'+fn+'"/></Relationships>');
+        }
         var rows=tbl.match(/<w:tr[\s\S]*?<\/w:tr>/g)||[];
         var rIdx=def.injectRow;if(rIdx>=rows.length)rIdx=rows.length-1;
         var cells=rows[rIdx].match(/<w:tc>[\s\S]*?<\/w:tc>/g)||[];
