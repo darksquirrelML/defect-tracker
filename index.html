@@ -986,7 +986,9 @@ function mkCard(d,i){
   el.className='card'+((d.afterImg||d.remark)?' dn':'');el.id='card-'+i;
   var bH=d.beforeImg?'<img src="'+d.beforeImg+'" alt="Before">':'<div class="pempty"><div class="pei">📷</div><div>No photo</div></div>';
   var aH=d.afterImg
-    ?'<img src="'+d.afterImg+'" alt="After">'
+    ?(d.remark
+      ?'<img src="'+d.afterImg+'" alt="After"><div style="position:absolute;bottom:18px;left:0;right:0;background:rgba(0,0,0,.7);font-size:10px;color:#FF6600;font-weight:700;padding:2px 5px;text-align:center;word-break:break-word;">'+d.remark+'</div>'
+      :'<img src="'+d.afterImg+'" alt="After">')
     :d.remark
       ?'<div class="pempty" style="padding:8px;text-align:center;font-size:11px;color:var(--yel);word-break:break-word;">📝 '+d.remark+'</div>'
       :'<div class="pempty"><div class="pei">📸</div><div>Tap to add</div></div>';
@@ -1130,11 +1132,20 @@ function generateReport(){
         var cIdx=def.injectCell||1;
         if(cells&&cells.length>cIdx){
           var nc;
-          if(def.afterImg){
+          if(def.afterImg&&def.remark){
+            // Photo + remark text below in same cell
+            var rmk=def.remark.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            nc='<w:tc>'+(def.afterTcPr||'')+
+              '<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r>'+mkImg(rId,cx,cy)+'</w:r></w:p>'+
+              '<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="FF6600"/><w:sz w:val="18"/></w:rPr><w:t>'+rmk+'</w:t></w:r></w:p>'+
+              '</w:tc>';
+          } else if(def.afterImg){
+            // Photo only
             nc='<w:tc>'+(def.afterTcPr||'')+'<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r>'+mkImg(rId,cx,cy)+'</w:r></w:p></w:tc>';
           } else if(def.remark){
-            // No photo — insert remark text into after cell
-            nc='<w:tc>'+(def.afterTcPr||'')+'<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="FF6600"/></w:rPr><w:t>'+def.remark.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</w:t></w:r></w:p></w:tc>';
+            // Remark only — no photo
+            var rmk=def.remark.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            nc='<w:tc>'+(def.afterTcPr||'')+'<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="FF6600"/></w:rPr><w:t>'+rmk+'</w:t></w:r></w:p></w:tc>';
           }
           if(nc) tbl=tbl.replace(rows[rIdx],rows[rIdx].replace(cells[cIdx],nc));
         }
