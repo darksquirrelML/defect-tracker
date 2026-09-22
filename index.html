@@ -1259,16 +1259,40 @@ function saveRemark(){
 }
 function deleteRemark(){
   if(remarkIdx===null) return;
-  defects[remarkIdx].remark=null;
-  hideMod('remarkOv');
   var i=remarkIdx;
+  var d=defects[i];
+  d.remark=null;
+  hideMod('remarkOv');
+  // Update UI — keep photo if exists
   var aslot=document.getElementById('aslot-'+i);
-  if(aslot) aslot.innerHTML='<div class="pempty"><div class="pei">📸</div><div>Tap to add</div></div><div class="plbl la">After</div>';
+  if(aslot){
+    if(d.afterImg){
+      aslot.innerHTML='<img src="'+d.afterImg+'" alt="After"><div class="plbl la">After</div>';
+    } else {
+      aslot.innerHTML='<div class="pempty"><div class="pei">📸</div><div>Tap to add</div></div><div class="plbl la">After</div>';
+    }
+  }
+  var card=document.getElementById('card-'+i);
+  if(card) card.className=d.afterImg?'card dn':'card';
+  var badge=document.getElementById('badge-'+i);
+  if(badge){badge.className=d.afterImg?'badge b-done':'badge b-pend';badge.textContent=d.afterImg?'✓ Done':'Pending';}
   var btnsDiv=document.getElementById('btns-'+i);
-  if(btnsDiv) btnsDiv.innerHTML='<div class="cbtns"><label for="cam-'+i+'" class="btn b-blu b-sm">📷 Camera</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div><button class="btn b-gst b-sm" style="width:100%;margin-top:6px;" onclick="addRemark('+i+')">📝 Add Remark</button>';
-  db('dt_after_photos?project_id=eq.'+encodeURIComponent(currentProject.id)+'&tbl_idx=eq.'+defects[remarkIdx].tblIdx,'DELETE')
-    .then(function(){ toast('Remark removed ✓','g'); })
-    .catch(function(e){ toast('Remove failed: '+e.message,'r'); });
+  if(btnsDiv) btnsDiv.innerHTML=d.afterImg
+    ?'<div class="cbtns"><label for="cam-'+i+'" class="btn b-gst b-sm">📷 Retake</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div><button class="btn b-red b-sm" style="width:100%;margin-top:6px;" onclick="deletePhoto('+i+')">🗑 Remove After Photo</button><button class="btn b-gst b-sm" style="width:100%;margin-top:6px;" onclick="addRemark('+i+')">📝 Add Remark</button>'
+    :'<div class="cbtns"><label for="cam-'+i+'" class="btn b-blu b-sm">📷 Camera</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div><button class="btn b-gst b-sm" style="width:100%;margin-top:6px;" onclick="addRemark('+i+')">📝 Add Remark</button>';
+  updateStats();
+  // If photo exists — just clear remark in Supabase (keep row)
+  var pid=encodeURIComponent(currentProject.id);
+  var tidx=d.tblIdx;
+  if(d.afterImg){
+    db('dt_after_photos?project_id=eq.'+pid+'&tbl_idx=eq.'+tidx,'PATCH',{remark:null})
+      .then(function(){ toast('Remark removed ✓','g'); })
+      .catch(function(e){ toast('Remove failed: '+e.message,'r'); });
+  } else {
+    db('dt_after_photos?project_id=eq.'+pid+'&tbl_idx=eq.'+tidx,'DELETE')
+      .then(function(){ toast('Remark removed ✓','g'); })
+      .catch(function(e){ toast('Remove failed: '+e.message,'r'); });
+  }
 }
 
 // ── DELETE PHOTO ──────────────────────────────────────
@@ -1276,20 +1300,35 @@ function deletePhoto(i){
   if(!confirm('Remove after photo for Defect #'+defects[i].num+'?')) return;
   var badge=document.getElementById('badge-'+i);
   if(badge){badge.className='badge b-sync';badge.textContent='⏳ Removing…';}
-  defects[i].afterImg=null;
-  // Update UI
+  var d=defects[i];
+  d.afterImg=null;
+  // Update UI — keep remark if exists
   var aslot=document.getElementById('aslot-'+i);
-  if(aslot) aslot.innerHTML='<div class="pempty"><div class="pei">📸</div><div>Tap to add</div></div><div class="plbl la">After</div>';
+  if(aslot){
+    if(d.remark){
+      aslot.innerHTML='<div class="pempty" style="padding:8px;text-align:center;font-size:11px;color:var(--yel);word-break:break-word;">📝 '+d.remark+'</div><div class="plbl la">After</div>';
+    } else {
+      aslot.innerHTML='<div class="pempty"><div class="pei">📸</div><div>Tap to add</div></div><div class="plbl la">After</div>';
+    }
+  }
   var card=document.getElementById('card-'+i);
-  if(card) card.className='card';
+  if(card) card.className=d.remark?'card dn':'card';
   var btnsDiv=document.getElementById('btns-'+i);
-  if(btnsDiv) btnsDiv.innerHTML='<div class="cbtns"><label for="cam-'+i+'" class="btn b-blu b-sm">📷 Camera</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div><button class="btn b-gst b-sm" style="width:100%;margin-top:6px;" onclick="addRemark('+i+')">📝 Add Remark</button>';
-  if(badge){badge.className='badge b-pend';badge.textContent='Pending';}
+  if(btnsDiv) btnsDiv.innerHTML='<div class="cbtns"><label for="cam-'+i+'" class="btn b-blu b-sm">📷 Camera</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div><button class="btn b-gst b-sm" style="width:100%;margin-top:6px;" onclick="addRemark('+i+')">'+(d.remark?'📝 Edit Remark':'📝 Add Remark')+'</button>';
+  if(badge){badge.className=d.remark?'badge b-done':'badge b-pend';badge.textContent=d.remark?'📝 Remark':'Pending';}
   updateStats();
-  // Delete from Supabase
-  db('dt_after_photos?project_id=eq.'+encodeURIComponent(currentProject.id)+'&tbl_idx=eq.'+defects[i].tblIdx,'DELETE')
-    .then(function(){ toast('After photo deleted ✓','g'); })
-    .catch(function(e){ toast('Cloud delete failed: '+e.message,'r'); });
+  // If remark exists — update Supabase row to remove photo only (keep remark)
+  var pid=encodeURIComponent(currentProject.id);
+  var tidx=d.tblIdx;
+  if(d.remark){
+    db('dt_after_photos?project_id=eq.'+pid+'&tbl_idx=eq.'+tidx,'PATCH',{photo_b64:null})
+      .then(function(){ toast('After photo removed ✓','g'); })
+      .catch(function(e){ toast('Cloud delete failed: '+e.message,'r'); });
+  } else {
+    db('dt_after_photos?project_id=eq.'+pid+'&tbl_idx=eq.'+tidx,'DELETE')
+      .then(function(){ toast('After photo removed ✓','g'); })
+      .catch(function(e){ toast('Cloud delete failed: '+e.message,'r'); });
+  }
 }
 
 // ── COPY CODE ──────────────────────────────────────────
