@@ -468,7 +468,7 @@ function updateCardBefore(i, dataUrl){
 
 function loadAfterPhotosBatch(code, total, offset){
   var LIMIT=20;
-  return db('dt_after_photos?project_id=eq.'+encodeURIComponent(code)+'&select=tbl_idx,photo_b64&limit='+LIMIT+'&offset='+offset)
+  return db('dt_after_photos?project_id=eq.'+encodeURIComponent(code)+'&select=tbl_idx,photo_b64,remark&limit='+LIMIT+'&offset='+offset)
     .then(function(photos){
       if(photos&&photos.length){
         photos.forEach(function(p){
