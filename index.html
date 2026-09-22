@@ -1115,7 +1115,7 @@ function generateReport(){
     var idRe=/Id="rId(\d+)"/g,idM,maxId=0;
     while((idM=idRe.exec(rXml))!==null){var n=parseInt(idM[1]);if(n>maxId)maxId=n;}
     var nextId=maxId+1,afterMap={};
-    defects.forEach(function(d){if(d.afterImg) afterMap[d.tblIdx]=d;});
+    defects.forEach(function(d){if(d.afterImg||d.remark) afterMap[d.tblIdx]=d;});
     var result='',lastIdx=0,tblIdx=0,tblRe=/<w:tbl>[\s\S]*?<\/w:tbl>/g,tM;
     while((tM=tblRe.exec(docXml))!==null){
       tblIdx++;result+=docXml.substring(lastIdx,tM.index);
