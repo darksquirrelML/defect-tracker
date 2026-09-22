@@ -1216,20 +1216,30 @@ function saveRemark(){
   if(!txt){ hideMod('remarkOv'); return; }
   defects[remarkIdx].remark=txt;
   hideMod('remarkOv');
-  // Update card
+  // Update card fully
   var i=remarkIdx;
   var card=document.getElementById('card-'+i);
   if(card){
+    // Update card border
+    card.className='card dn';
+    // Update badge
+    var badge=document.getElementById('badge-'+i);
+    if(badge){badge.className='badge b-done';badge.textContent='📝 Remark';}
+    // Update after slot
     var aslot=document.getElementById('aslot-'+i);
     if(aslot) aslot.innerHTML='<div class="pempty" style="padding:8px;text-align:center;font-size:11px;color:var(--yel);word-break:break-word;">📝 '+txt+'</div><div class="plbl la">After</div>';
+    // Update buttons
     var btnsDiv=document.getElementById('btns-'+i);
     if(btnsDiv) btnsDiv.innerHTML='<div class="cbtns"><label for="cam-'+i+'" class="btn b-blu b-sm">📷 Camera</label><label for="gal-'+i+'" class="btn b-gst b-sm">📁 Gallery</label></div><button class="btn b-gst b-sm" style="width:100%;margin-top:6px;" onclick="addRemark('+i+')">📝 Edit Remark</button>';
   }
+  updateStats();
   // Save to Supabase
-  db('dt_after_photos?project_id=eq.'+encodeURIComponent(currentProject.id)+'&tbl_idx=eq.'+defects[remarkIdx].tblIdx,'DELETE').then(function(){
-    return db('dt_after_photos','POST',{project_id:currentProject.id,tbl_idx:defects[remarkIdx].tblIdx,photo_b64:null,remark:txt});
+  var pid=encodeURIComponent(currentProject.id);
+  var tidx=defects[remarkIdx].tblIdx;
+  db('dt_after_photos?project_id=eq.'+pid+'&tbl_idx=eq.'+tidx,'DELETE').then(function(){
+    return db('dt_after_photos','POST',{project_id:currentProject.id,tbl_idx:tidx,remark:txt});
   }).then(function(){ toast('Remark saved ✓','g'); })
-  .catch(function(e){ toast('Save failed: '+e.message,'r'); });
+  .catch(function(e){ console.error('Remark save error:',e); toast('Save failed: '+e.message,'r'); });
 }
 function deleteRemark(){
   if(remarkIdx===null) return;
