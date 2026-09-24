@@ -220,6 +220,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
     <div class="stat"><div class="dot d-r"></div><div><div class="sl">Pending</div><div class="sv" id="sP">0</div></div></div>
     <div class="prog"><div class="sl">Progress</div><div class="pbar"><div class="pfil" id="pF"></div></div></div>
     <div class="bbtns">
+      <button class="btn b-gst b-sm" id="pendingBtn" onclick="togglePending()">⏳ Pending Only</button>
       <button class="btn b-gst b-sm" onclick="refreshPhotos()">🔄</button>
       <button class="btn b-grn b-sm" onclick="showGen()">📥 Report</button>
     </div>
@@ -482,7 +483,7 @@ function loadAfterPhotosBatch(code, total, offset){
 }
 
 function loadBeforeImgsBatch(code,relsMap,start){
-  var BATCH=50;
+  var BATCH=20;
   if(start===0){
     window._imgQ=[];
     defects.forEach(function(d,i){
@@ -604,7 +605,7 @@ try{
 }catch(e){}
 
 var defects=[],docB64=null,rels={},media={},xmlFiles={},selectedFile=null,currentProject=null;
-var currentPage=1,PAGE_SIZE=50;
+var currentPage=1,PAGE_SIZE=20,showPendingOnly=false;
 
 // ── INIT ──────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',function(){
@@ -938,18 +939,28 @@ function renderProject(){
 function renderCards(){
   var g=document.getElementById('grid');
   g.innerHTML='';
-  var total=defects.length;
+  // Filter defects based on pending only mode
+  var list=showPendingOnly
+    ?defects.map(function(d,i){return{d:d,i:i};}).filter(function(x){return !x.d.afterImg&&!x.d.remark;})
+    :defects.map(function(d,i){return{d:d,i:i};});
+  var total=list.length;
   var totalPages=Math.ceil(total/PAGE_SIZE)||1;
   if(currentPage>totalPages) currentPage=1;
   var start=(currentPage-1)*PAGE_SIZE;
   var end=Math.min(start+PAGE_SIZE,total);
-  for(var i=start;i<end;i++) g.appendChild(mkCard(defects[i],i));
-  // Render both top and bottom pagination
+  for(var j=start;j<end;j++) g.appendChild(mkCard(list[j].d,list[j].i));
+  // Render pagination
   var pgnTop=document.getElementById('pgn-top');
   var pgnBot=document.getElementById('pgn');
   var html=buildPagination(totalPages,total);
   if(pgnTop) pgnTop.innerHTML=totalPages<=1?'':html;
   if(pgnBot) pgnBot.innerHTML=totalPages<=1?'':html;
+  // Update pending button style
+  var btn=document.getElementById('pendingBtn');
+  if(btn){
+    btn.className=showPendingOnly?'btn b-red b-sm':'btn b-gst b-sm';
+    btn.textContent=showPendingOnly?'⏳ Pending ('+total+')':'⏳ Pending Only';
+  }
 }
 
 function buildPagination(totalPages,total){
@@ -962,6 +973,12 @@ function buildPagination(totalPages,total){
     '<select class="pgn-sel" onchange="goPage(parseInt(this.value))">'+opts+'</select>'+
     '<span class="pgn-info">of '+totalPages+' &nbsp;('+total+' defects)</span>'+
     '<button class="pgn-btn" onclick="goPage('+(currentPage+1)+')" '+(currentPage>=totalPages?'disabled':'')+'>Next →</button>';
+}
+
+function togglePending(){
+  showPendingOnly=!showPendingOnly;
+  currentPage=1;
+  renderCards();
 }
 
 function goPage(p){
