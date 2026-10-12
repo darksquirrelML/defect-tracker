@@ -1144,21 +1144,15 @@ function generateReport(){
         if(cells&&cells.length>cIdx){
           var nc;
           if(def.afterImg&&def.remark){
-            // Photo + remark text below in same cell — vertically centered
+            // Photo + remark text below in same cell
             var rmk=def.remark.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-            var tcPr=def.afterTcPr||'';
-            if(tcPr) tcPr=tcPr.replace('</w:tcPr>','<w:vAlign w:val="center"/></w:tcPr>');
-            else tcPr='<w:tcPr><w:vAlign w:val="center"/></w:tcPr>';
-            nc='<w:tc>'+tcPr+
+            nc='<w:tc>'+(def.afterTcPr||'')+
               '<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r>'+mkImg(rId,cx,cy)+'</w:r></w:p>'+
               '<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/><w:sz w:val="18"/></w:rPr><w:t>'+rmk+'</w:t></w:r></w:p>'+
               '</w:tc>';
           } else if(def.afterImg){
-            // Photo only — vertically centered
-            var tcPr=def.afterTcPr||'';
-            if(tcPr) tcPr=tcPr.replace('</w:tcPr>','<w:vAlign w:val="center"/></w:tcPr>');
-            else tcPr='<w:tcPr><w:vAlign w:val="center"/></w:tcPr>';
-            nc='<w:tc>'+tcPr+'<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r>'+mkImg(rId,cx,cy)+'</w:r></w:p></w:tc>';
+            // Photo only
+            nc='<w:tc>'+(def.afterTcPr||'')+'<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r>'+mkImg(rId,cx,cy)+'</w:r></w:p></w:tc>';
           } else if(def.remark){
             // Remark only — no photo, vertically centered
             var rmk=def.remark.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
