@@ -1110,7 +1110,7 @@ function updateStats(){
 
 // ── GENERATE REPORT ────────────────────────────────────
 function showGen(){
-  var t=defects.length,d=defects.filter(function(x){return x.afterImg;}).length;
+  var t=defects.length,d=defects.filter(function(x){return x.afterImg||x.remark;}).length;
   document.getElementById('gT').textContent=t;document.getElementById('gD').textContent=d;document.getElementById('gP').textContent=t-d;
   showScr('scrGen');
 }
@@ -1169,7 +1169,7 @@ function generateReport(){
     zip.file('word/document.xml',result);zip.file('word/_rels/document.xml.rels',rXml);zip.file('[Content_Types].xml',ct);
     return zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6},mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
   }).then(function(blob){
-    var done=defects.filter(function(d){return d.afterImg;}).length;
+    var done=defects.filter(function(d){return d.afterImg||d.remark;}).length;
     var today=new Date();
     var dd=String(today.getDate()).padStart(2,'0');
     var mm=String(today.getMonth()+1).padStart(2,'0');
